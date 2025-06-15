@@ -1,0 +1,227 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photo Collage App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@7/babel.min.js"></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+</head>
+<body>
+  <div id="root" class="min-h-screen bg-gray-100"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Google Drive API Configuration
+    const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
+    const API_KEY = 'AIzaSyBDCNxfd_hjhAVk0lFcgaoTvZrHbQOAhAY';
+    const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    const FOLDER_ID = '1fBeZUVeb3P0WVYE06YCfDyU9hy_vC0mf';
+    const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/CdfCyB826p48jxRhvDFuGU';
+
+    function App() {
+      const [photos, setPhotos] = useState([]);
+      const [collageUrl, setCollageUrl] = useState(null);
+      const [gapiReady, setGapiReady] = useState(false);
+
+      // Initialize Google API
+      useEffect(() => {
+        window.gapi.load('client:auth2', () => {
+          window.gapi.client.init({
+            apiKey: API_KEY,
+            clientId: CLIENT_ID,
+            discoveryDocs: DISCOVERY_DOCS,
+            scope: SCOPES,
+          }).then(() => setGapiReady(true));
+        });
+      }, []);
+
+      // Handle photo upload
+      const handlePhotoUpload = (e, category) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            setPhotos([...photos, { url: reader.result, category }]);
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      // Create collage
+      const createCollage = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw bill (prominent)
+        const bill = photos.find(p => p.category === 'Bill');
+        if (bill) {
+          const img = new Image();
+          img.src = bill.url;
+          img.onload = () => {
+            ctx.drawImage(img, 200, 50, 400, 300); // Centered, larger
+            drawItems(canvas, ctx);
+          };
+        } else {
+          drawItems(canvas, ctx);
+        }
+      };
+
+      // Draw items (less prominent)
+      const drawItems = (canvas, ctx) => {
+        const items = photos.filter(p => p.category === 'Item');
+        const positions = [
+          [50, 400, 150, 150], [250, 400, 150, 150],
+          [450, 400, 150, 150], [650, 400, 150, 150]
+        ];
+        let index = 0;
+        items.forEach(item => {
+          if (index < positions.length) {
+            const img = new Image();
+            img.src = item.url;
+            img.onload = () => {
+              ctx.drawImage(img, ...positions[index]);
+              if (index === items.length - 1 || index === positions.length - 1) {
+                setCollageUrl(canvas.toDataURL('image/jpeg'));
+              }
+            };
+            index++;
+          }
+        });
+        if (items.length === 0) {
+          setCollageUrl(canvas.toDataURL('image/jpeg'));
+        }
+      };
+
+      // Upload to Google Drive
+      const uploadToDrive = async () => {
+        if (!gapiReady || !collageUrl) return;
+        const blob = await (await fetch(collageUrl)).blob();
+        const metadata = {
+          name: `collage_${new Date().toISOString()}.jpg`,
+          mimeType: 'image/jpeg',
+          parents: [FOLDER_ID],
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+        try {
+          await window.gapi.client.request({
+            path: '/upload/drive/v3/files',
+            method: 'POST',
+            params: { uploadType: 'multipart' },
+            body: form,
+          });
+          alert('Uploaded to Google Drive!');
+        } catch (error) {
+          console.error('Drive upload error:', error);
+          alert('Failed to upload to Google Drive.');
+        }
+      };
+
+      // Share to WhatsApp
+      const shareToWhatsApp = () => {
+        if (collageUrl) {
+          const link = `${WHATSAPP_GROUP_LINK}&text=Check%20out%20this%20collage!`;
+          window.open(link, '_blank');
+        }
+      };
+
+      // Handle send button
+      const handleSend = async () => {
+        await uploadToDrive();
+        shareToWhatsApp();
+      };
+
+      return (
+        <div className="p-4 max-w-4xl mx-auto">
+          <h1 className="text-2xl font-bold mb-4">Photo Collage App</h1>
+          <div className="mb-4">
+            <label className="block mb-2">Upload Bill Photo:</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handlePhotoUpload(e, 'Bill')}
+              className="mb-2"
+            />
+            <label className="block mb-2">Upload Item Photo:</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handlePhotoUpload(e, 'Item')}
+              className="mb-2"
+            />
+          </div>
+          <button
+            onClick={createCollage}
+            className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
+          >
+            Create Collage
+          </button>
+          {collageUrl && (
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">Collage Preview</h2>
+              <img src={collageUrl} alt="Collage" className="max-w-full h-auto" />
+              <button
+                onClick={handleSend}
+                className="bg-green-500 text-white px-4 py-2 rounded mt-4"
+              >
+                Send
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
