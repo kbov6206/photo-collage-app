@@ -3,20 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <div id="root" class="min-h-screen bg-gray-100"></div>
   <script type="text/babel">
     try {
-      const { useState, useEffect, useRef } = React;
+      const { useState, useEffect, useRef, Component } = React;
       const { createRoot } = ReactDOM;
+
+      // Error Boundary Component
+      class ErrorBoundary extends Component {
+        state = { hasError: false, error: null };
+        static getDerivedStateFromError(error) {
+          return { hasError: true, error };
+        }
+        render() {
+          if (this.state.hasError) {
+            return (
+              <div className="p-4 max-w-4xl mx-auto text-red-500">
+                <h1 className="text-2xl font-bold mb-4">Something went wrong.</h1>
+                <p>{this.state.error.message || 'Please try refreshing the page.'}</p>
+              </div>
+            );
+          }
+          return this.props.children;
+        }
+      }
 
       // Google Drive API Configuration
       const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
@@ -34,25 +54,53 @@
 
         // Initialize Google API Client
         useEffect(() => {
-          window.gapi.load('client', () => {
-            window.gapi.client.init({
-              apiKey: API_KEY,
-              discoveryDocs: DISCOVERY_DOCS,
-            }).then(() => {
-              setGapiReady(true);
-              tokenClientRef.current = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: (tokenResponse) => {
-                  if (tokenResponse && tokenResponse.access_token) {
-                    window.gapi.client.setToken(tokenResponse);
-                  } else {
-                    console.error('Token response error:', tokenResponse);
-                  }
-                },
-              });
-            }).catch(error => console.error('GAPI client init error:', error));
-          });
+          const initGapi = () => {
+            if (!window.gapi) {
+              console.error('Google API script not loaded');
+              return;
+            }
+            window.gapi.load('client', () => {
+              window.gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: DISCOVERY_DOCS,
+              }).then(() => {
+                setGapiReady(true);
+                if (!window.google || !window.google.accounts) {
+                  console.error('Google Identity Services not loaded');
+                  return;
+                }
+                tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+                  client_id: CLIENT_ID,
+                  scope: SCOPES,
+                  callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                      window.gapi.client.setToken(tokenResponse);
+                    } else {
+                      console.error('Token response error:', tokenResponse);
+                    }
+                  },
+                });
+              }).catch(error => console.error('GAPI client init error:', error));
+            });
+          };
+
+          // Check if gapi is already loaded or wait for load event
+          if (window.gapi && window.gapi.load) {
+            initGapi();
+          } else {
+            const script = document.querySelector('script[src="https://apis.google.com/js/api.js"]');
+            if (script) {
+              script.addEventListener('load', initGapi);
+            } else {
+              console.error('Google API script not found');
+            }
+          }
+
+          return () => {
+            if (script) {
+              script.removeEventListener('load', initGapi);
+            }
+          };
         }, []);
 
         // Get access token
@@ -128,7 +176,7 @@
           if (bill) {
             const img = new Image();
             img.src = bill.url;
-            img.crossOrigin = 'Anonymous'; // Prevent tainted canvas
+            img.crossOrigin = 'Anonymous';
             img.onload = () => {
               console.log('Bill image loaded');
               ctx.drawImage(img, 200, 50, 400, 300);
@@ -158,7 +206,7 @@
             if (index < 4) {
               const img = new Image();
               img.src = item.url;
-              img.crossOrigin = 'Anonymous'; // Prevent tainted canvas
+              img.crossOrigin = 'Anonymous';
               img.onload = () => {
                 console.log('Item image loaded', index);
                 const positions = [
@@ -292,7 +340,11 @@
       }
 
       const root = createRoot(document.getElementById('root'));
-      root.render(<App />);
+      root.render(
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      );
     } catch (error) {
       console.error('Rendering error:', error);
     }
