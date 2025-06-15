@@ -50,7 +50,7 @@
         const [billNumber, setBillNumber] = useState('');
         const [collageUrl, setCollageUrl] = useState(null);
         const [gapiReady, setGapiReady] = useState(false);
-        const [isSharing, setIsSharing] = useState(false);
+        const [isSavingAndSharing, setIsSavingAndSharing] = useState(false);
         const tokenClientRef = useRef(null);
         const canvasRef = useRef(null);
 
@@ -303,12 +303,10 @@
         // Upload to Google Drive
         const uploadToDrive = async () => {
           if (!gapiReady || !collageUrl || !canvasRef.current) {
-            alert('Please create a collage first.');
-            return;
+            throw new Error('Please create a collage first.');
           }
           if (!billNumber.trim()) {
-            alert('Please enter a Bill Number.');
-            return;
+            throw new Error('Please enter a Bill Number.');
           }
           try {
             const accessToken = await getAccessToken();
@@ -349,81 +347,101 @@
             const result = await response.json();
             console.log('Drive upload response:', result);
             if (response.ok && result.id) {
-              alert(`Uploaded to Google Drive! File ID: ${result.id}`);
+              return result.id;
             } else {
               throw new Error(`Upload failed: ${JSON.stringify(result)}`);
             }
           } catch (error) {
             console.error('Upload error:', error);
-            alert('Failed to upload to Google Drive: ' + (error.message || 'Unknown error'));
+            throw error;
           }
         };
 
-        // Share to WhatsApp
-        const shareToWhatsApp = () => {
-          if (!collageUrl || !canvasRef.current || isSharing) {
-            if (isSharing) alert('Please wait for the previous share to complete.');
-            else alert('Please create a collage first.');
-            return;
+        // Share to browser
+        const shareToBrowser = () => {
+          if (!collageUrl || !canvasRef.current) {
+            throw new Error('Please create a collage first.');
           }
           if (!billNumber.trim()) {
-            alert('Please enter a Bill Number.');
-            return;
+            throw new Error('Please enter a Bill Number.');
           }
-          setIsSharing(true);
-          console.log('Sharing to WhatsApp with Bill Number:', billNumber);
-          try {
-            canvasRef.current.toBlob(blob => {
-              try {
-                if (!blob) {
-                  throw new Error('Failed to convert canvas to blob');
-                }
-                const file = new File([blob], `${sanitizeFilename(billNumber)}.jpg`, { type: 'image/jpeg' });
-                const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-                if (isMobile && navigator.share) {
-                  navigator.share({
-                    files: [file],
-                    text: billNumber,
-                  }).then(() => {
-                    console.log('WhatsApp share successful');
-                  }).catch(error => {
-                    console.error('Navigator share error:', error);
+          return new Promise((resolve, reject) => {
+            try {
+              canvasRef.current.toBlob(blob => {
+                try {
+                  if (!blob) {
+                    throw new Error('Failed to convert canvas to blob');
+                  }
+                  const file = new File([blob], `${sanitizeFilename(billNumber)}.jpg`, { type: 'image/jpeg' });
+                  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+                  if (isMobile && navigator.share) {
+                    console.log('Sharing to browser with Bill Number:', billNumber);
+                    navigator.share({
+                      files: [file],
+                      text: billNumber,
+                    }).then(() => {
+                      console.log('Browser share successful');
+                      resolve(true);
+                    }).catch(error => {
+                      console.error('Navigator share error:', error);
                     if (error.name !== 'AbortError') {
-                      alert('Failed to share to WhatsApp. Downloading collage for manual sharing.');
+                      reject(new Error('Failed to share to browser. Downloading collage for manual sharing'));
                       const link = document.createElement('a');
                       link.href = collageUrl;
                       link.download = `${sanitizeFilename(billNumber)}.jpg`;
                       link.click();
+                    } else {
+                      resolve(false);
                     }
-                  }).finally(() => {
-                    setIsSharing(false);
-                  });
-                } else {
-                  alert('WhatsApp sharing not supported. Downloading collage for manual sharing.');
-                  const link = document.createElement('a');
-                  link.href = collageUrl;
-                  link.download = `${sanitizeFilename(billNumber)}.jpg`;
-                  link.click();
-                  setIsSharing(false);
+                    }).catch(() => {
+                      setIsSavingAndSharing(false);
+                    });
+                  } else {
+                    console.log('Browser sharing not supported, downloading');
+                    const link = document.createElement('a');
+                    link.href = collageUrl;
+                    link.download = `${sanitizeFilename(billNumber)}.jpg`;
+                    link.click();
+                    resolve(false);
+                  }
+                } catch (error) {
+                  console.error('Browser sharing error:', error);
+                  reject(error);
                 }
-              } catch (error) {
-                console.error('WhatsApp sharing error:', error);
-                alert('Failed to share to WhatsApp. Downloading collage for manual sharing.');
-                const link = document.createElement('a');
-                link.href = collageUrl;
-                link.download = `${sanitizeFilename(billNumber)}.jpg`;
-                link.click();
-                setIsSharing(false);
+              }, 'image/jpeg', 0.9);
+            } catch (error) {
+              console.error('Browser sharing error:', error);
+              reject(error);
+            }
+          });
+        };
+
+        // Save and Share
+        const saveAndShare = async () => {
+          if (isSavingAndSharing) {
+            alert('Please wait for the previous operation to complete.');
+            return;
+          }
+          setIsSavingAndSharing(true);
+          try {
+            // Step 1: Upload to Google Drive
+            try {
+              const fileId = await uploadToDrive();
+              alert(`Uploaded to Google Drive! File ID: ${fileId}`);
+            } catch (driveError) {
+              alert('Failed to upload to Google Drive: ' + (driveError.message || 'Unknown error') + '. Proceeding to share.');
+            }
+            // Step 2: Share to WhatsApp
+            try {
+              const shared = await shareToWhatsApp();
+              if (!shared) {
+                alert('WhatsApp sharing not supported or canceled. Collage downloaded for manual sharing.');
               }
-            }, 'image/jpeg', 0.9);
-          } catch (error) {
-            console.error('WhatsApp sharing error:', error);
-            alert('Failed to share to WhatsApp. Downloading collage for manual sharing.');
-            const link = document.createElement('a');
-            link.href = collageUrl;
-            link.download = `${sanitizeFilename(billNumber)}.jpg`;
-            link.click();
-            setIsSharing(false);
+            } catch (shareError) {
+              alert('Failed to share to WhatsApp: ' + (shareError.message || 'Unknown error') + '. Collage downloaded for manual sharing.');
+            }
+          } finally {
+            setIsSavingAndSharing(false);
           }
         };
 
@@ -495,19 +513,13 @@
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Collage Preview</h2>
                 <img src={collageUrl} alt="Collage" className="max-w-full h-auto mb-4" />
-                <div className="flex space-x-4">
+                <div className="flex">
                   <button
-                    onClick={uploadToDrive}
+                    onClick={saveAndShare}
                     className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                    disabled={isSavingAndSharing}
                   >
-                    Upload to Drive
-                  </button>
-                  <button
-                    onClick={shareToWhatsApp}
-                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                    disabled={isSharing}
-                  >
-                    {isSharing ? 'Sharing...' : 'Share to WhatsApp'}
+                    {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
                   </button>
                 </div>
               </div>
