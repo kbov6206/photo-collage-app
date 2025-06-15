@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://apis.google.com https://cdnjs.cloudflare.com 'sha256-moa2ECyjPNDV3YwkPL/OoHicxZm7CuSgg9YB7zuhYuI='; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://apis.google.com https://cdnjs.cloudflare.com 'sha256-D3V5aTFJZ1+IQJoPwqtoUKGFL5m5A7qn3558IL//wss='; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -106,7 +106,10 @@
 
         // Upload to Google Drive
         const uploadToDrive = async () => {
-          if (!gapiReady || !collageUrl) return;
+          if (!gapiReady || !collageUrl) {
+            alert('Please create a collage first.');
+            return;
+          }
           const blob = await (await fetch(collageUrl)).blob();
           const metadata = {
             name: `collage_${new Date().toISOString()}.jpg`,
@@ -126,15 +129,24 @@
             alert('Uploaded to Google Drive!');
           } catch (error) {
             console.error('Drive upload error:', error);
-            alert('Failed to upload to Google Drive.');
+            alert('Failed to upload to Google Drive: ' + error.message);
           }
         };
 
         // Share to WhatsApp
         const shareToWhatsApp = () => {
-          if (collageUrl) {
-            const link = `${WHATSAPP_GROUP_LINK}&text=Check%20out%20this%20collage!`;
+          if (!collageUrl) {
+            alert('Please create a collage first.');
+            return;
+          }
+          const text = `Check out this collage!`;
+          const encodedText = encodeURIComponent(text);
+          const link = `https://api.whatsapp.com/send?phone=&text=${encodedText}&group_invite=${WHATSAPP_GROUP_LINK.split('/').pop()}`;
+          try {
             window.open(link, '_blank');
+          } catch (error) {
+            console.error('WhatsApp sharing error:', error);
+            alert('Failed to open WhatsApp. Please check the group link or try again.');
           }
         };
 
