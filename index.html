@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com data:; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -51,6 +51,7 @@
         const [collageUrl, setCollageUrl] = useState(null);
         const [gapiReady, setGapiReady] = useState(false);
         const tokenClientRef = useRef(null);
+        const canvasRef = useRef(null);
 
         // Initialize Google API Client
         useEffect(() => {
@@ -84,7 +85,6 @@
             });
           };
 
-          // Check if gapi is already loaded or wait for load event
           if (window.gapi && window.gapi.load) {
             initGapi();
           } else {
@@ -110,8 +110,22 @@
               reject('Token client not initialized');
               return;
             }
+            const existingToken = window.gapi.client.getToken();
+            if (existingToken && existingToken.access_token) {
+              console.log('Using existing access token');
+              // Verify token is not expired
+              const now = Date.now() / 1000;
+              if (existingToken.expires_at && existingToken.expires_at > now + 60) {
+                resolve(existingToken.access_token);
+                return;
+              } else {
+                console.log('Token expired or invalid, requesting new token');
+                window.gapi.client.setToken(null);
+              }
+            }
             tokenClientRef.current.callback = (tokenResponse) => {
               if (tokenResponse && tokenResponse.access_token) {
+                tokenResponse.expires_at = Math.floor(Date.now() / 1000) + tokenResponse.expires_in;
                 window.gapi.client.setToken(tokenResponse);
                 resolve(tokenResponse.access_token);
               } else {
@@ -166,11 +180,14 @@
             return;
           }
           const canvas = document.createElement('canvas');
-          canvas.width = 800;
-          canvas.height = 600;
+          canvas.width = 1200;
+          canvas.height = 900;
+          canvasRef.current = canvas;
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#fff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.font = 'bold 24px Arial';
+          ctx.fillStyle = '#000';
 
           const bill = photos.find(p => p.category === 'Bill');
           if (bill) {
@@ -179,7 +196,22 @@
             img.crossOrigin = 'Anonymous';
             img.onload = () => {
               console.log('Bill image loaded');
-              ctx.drawImage(img, 200, 50, 400, 300);
+              const aspect = img.width / img.height;
+              const maxWidth = 600;
+              const maxHeight = 450;
+              let width = maxWidth;
+              let height = width / aspect;
+              if (height > maxHeight) {
+                height = maxHeight;
+                width = height * aspect;
+              }
+              const x = 300 + (maxWidth - width) / 2;
+              const y = 50 + (maxHeight - height) / 2;
+              ctx.drawImage(img, x, y, width, height);
+              ctx.strokeStyle = '#000';
+              ctx.lineWidth = 4;
+              ctx.strokeRect(x, y, width, height);
+              ctx.fillText('Bill', x, y - 10);
               drawItems(canvas, ctx);
             };
             img.onerror = () => {
@@ -197,7 +229,12 @@
           const items = photos.filter(p => p.category === 'Item');
           console.log('Drawing items:', items.length);
           if (items.length === 0) {
-            setCollageUrl(canvas.toDataURL('image/jpeg'));
+            try {
+              setCollageUrl(canvas.toDataURL('image/jpeg', 0.9));
+            } catch (error) {
+              console.error('Canvas tainted error:', error);
+              alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+            }
             return;
           }
           let loaded = 0;
@@ -210,14 +247,28 @@
               img.onload = () => {
                 console.log('Item image loaded', index);
                 const positions = [
-                  [50, 400, 150, 150], [250, 400, 150, 150],
-                  [450, 400, 150, 150], [650, 400, 150, 150]
+                  [50, 600, 250, 250], [350, 600, 250, 250],
+                  [650, 600, 250, 250], [950, 600, 250, 250]
                 ];
-                ctx.drawImage(img, ...positions[index]);
+                const [x, y, maxWidth, maxHeight] = positions[index];
+                const aspect = img.width / img.height;
+                let width = maxWidth;
+                let height = width / aspect;
+                if (height > maxHeight) {
+                  height = maxHeight;
+                  width = height * aspect;
+                }
+                const drawX = x + (maxWidth - width) / 2;
+                const drawY = y + (maxHeight - height) / 2;
+                ctx.drawImage(img, drawX, drawY, width, height);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(drawX, drawY, width, height);
+                ctx.fillText(`Item ${index + 1}`, drawX, drawY - 10);
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    setCollageUrl(canvas.toDataURL('image/jpeg'));
+                    setCollageUrl(canvas.toDataURL('image/jpeg', 0.9));
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
@@ -230,7 +281,7 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    setCollageUrl(canvas.toDataURL('image/jpeg'));
+                    setCollageUrl(canvas.toDataURL('image/jpeg', 0.9));
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
@@ -243,13 +294,18 @@
 
         // Upload to Google Drive
         const uploadToDrive = async () => {
-          if (!gapiReady || !collageUrl) {
+          if (!gapiReady || !collageUrl || !canvasRef.current) {
             alert('Please create a collage first.');
             return;
           }
           try {
             await getAccessToken();
-            const blob = await (await fetch(collageUrl)).blob();
+            const blob = await new Promise((resolve, reject) => {
+              canvasRef.current.toBlob(blob => {
+                if (blob) resolve(blob);
+                else reject('Failed to convert canvas to blob');
+              }, 'image/jpeg', 0.9);
+            });
             const metadata = {
               name: `collage_${new Date().toISOString()}.jpg`,
               mimeType: 'image/jpeg',
@@ -258,7 +314,7 @@
             const form = new FormData();
             form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             form.append('file', blob);
-            const response = await window.gapi.client.request({
+            const uploadResponse = await window.gapi.client.request({
               path: '/upload/drive/v3/files',
               method: 'POST',
               params: { uploadType: 'multipart' },
@@ -267,32 +323,51 @@
             alert('Uploaded to Google Drive!');
           } catch (error) {
             console.error('Upload error:', error);
-            alert('Failed to upload to Google Drive: ' + (error.message || error));
+            alert('Failed to upload to Google Drive: ' + (error.message || 'Unknown error'));
           }
         };
 
         // Share to WhatsApp
-        const shareToWhatsApp = () => {
-          if (!collageUrl) {
+        const shareToWhatsApp = async () => {
+          if (!collageUrl || !canvasRef.current) {
             alert('Please create a collage first.');
             return;
           }
-          const text = `Check out this collage!`;
-          const encodedText = encodeURIComponent(text);
-          const groupInviteCode = WHATSAPP_GROUP_LINK.split('/').pop();
-          const link = `https://api.whatsapp.com/send?phone=&text=${encodedText}&group_invite=${groupInviteCode}`;
+          const text = `Check out this collage! Please share in the group: ${WHATSAPP_GROUP_LINK}`;
           try {
-            window.open(link, '_blank');
+            const blob = await new Promise((resolve, reject) => {
+              canvasRef.current.toBlob(blob => {
+                if (blob) resolve(blob);
+                else reject('Failed to convert canvas to blob');
+              }, 'image/jpeg', 0.9);
+            });
+            const file = new File([blob], 'collage.jpg', { type: 'image/jpeg' });
+            if (navigator.share) {
+              await navigator.share({
+                files: [file],
+                text: text,
+              });
+            } else {
+              alert('Web Share API not supported. Downloading collage for manual sharing.');
+              const link = document.createElement('a');
+              link.href = collageUrl;
+              link.download = 'collage.jpg';
+              link.click();
+            }
           } catch (error) {
             console.error('WhatsApp sharing error:', error);
-            alert('Failed to open WhatsApp. Please check the group link or try again.');
+            alert('Failed to share to WhatsApp. Downloading collage for manual sharing.');
+            const link = document.createElement('a');
+            link.href = collageUrl;
+            link.download = 'collage.jpg';
+            link.click();
           }
         };
 
         // Handle send button
         const handleSend = async () => {
           await uploadToDrive();
-          shareToWhatsApp();
+          await shareToWhatsApp();
         };
 
         return (
