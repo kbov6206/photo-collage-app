@@ -363,7 +363,7 @@
                   throw new Error('Failed to convert canvas to blob');
                 }
                 const file = new File([blob], 'collage.jpg', { type: 'image/jpeg' });
-                if (navigator.share) {
+                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                   navigator.share({
                     files: [file],
                     text: text,
@@ -382,12 +382,32 @@
                     setIsSharing(false);
                   });
                 } else {
-                  alert('Web Share API not supported. Downloading collage for manual sharing.');
-                  const link = document.createElement('a');
-                  link.href = collageUrl;
-                  link.download = 'collage.jpg';
-                  link.click();
-                  setIsSharing(false);
+                  // Fallback to WhatsApp deep-link
+                  const encodedText = encodeURIComponent(text);
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const base64data = reader.result.split(',')[1];
+                    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+                    window.open(whatsappUrl, '_blank');
+                    setTimeout(() => {
+                      alert('Please select the group in WhatsApp and attach the downloaded collage.');
+                      const link = document.createElement('a');
+                      link.href = collageUrl;
+                      link.download = 'collage.jpg';
+                      link.click();
+                      setIsSharing(false);
+                    }, 1000);
+                  };
+                  reader.onerror = () => {
+                    console.error('Failed to read blob for WhatsApp');
+                    alert('Failed to share to WhatsApp. Downloading collage for manual sharing.');
+                    const link = document.createElement('a');
+                    link.href = collageUrl;
+                    link.download = 'collage.jpg';
+                    link.click();
+                    setIsSharing(false);
+                  };
+                  reader.readAsDataURL(blob);
                 }
               } catch (error) {
                 console.error('WhatsApp sharing error:', error);
@@ -414,19 +434,17 @@
           <div className="p-4 max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold mb-4">Photo Collage App</h1>
             <div className="mb-4">
-              <label className="block mb-2">Upload Bill Photo (Camera or File):</label>
+              <label className="block mb-2">Upload Bill Photo (Camera or Gallery):</label>
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={(e) => handlePhotoUpload(e, 'Bill')}
                 className="mb-2"
               />
-              <label className="block mb-2">Upload Item Photos (Camera or Files, Multiple Allowed):</label>
+              <label className="block mb-2">Upload Item Photos (Camera or Gallery, Multiple Allowed):</label>
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 multiple
                 onChange={(e) => handlePhotoUpload(e, 'Item')}
                 className="mb-2"
