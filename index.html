@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://apis.google.com https://cdnjs.cloudflare.com 'sha256-moa2ECyjPNDV3YwkPL/OoHicxZm7CuSgg9YB7zuhYuI='; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://apis.google.com https://cdnjs.cloudflare.com 'sha256-moa2ECyjPNDV3YwkPL/OoHicxZm7CuSgg9YB7zuhYuI='; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -16,6 +16,7 @@
   <script type="text/babel">
     try {
       const { useState, useEffect } = React;
+      const { createRoot } = ReactDOM;
 
       // Google Drive API Configuration
       const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
@@ -184,7 +185,8 @@
         );
       }
 
-      ReactDOM.render(<App />, document.getElementById('root'));
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
     } catch (error) {
       console.error('Rendering error:', error);
     }
