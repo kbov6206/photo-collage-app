@@ -476,32 +476,27 @@
               </div>
               <label className="block mb-2 font-medium">Item Photos (Multiple Allowed for Gallery):</label>
               <div className="flex space-x-4 mb-4">
-                <div className="flex space-x-4 mb-4">
-                  <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
-                    Camera/
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => handlePhotoUpload(e, 'Item')}
-                      onChange={(e=> handlePhotoOnChange(e, 'Camera', 'Item')}
-                      className="hidden"
-                    />
-                    /
-                  </label>
-                  <label className="bg-green-500 text-white px-4 py-4 py-2 rounded cursor-pointer hover:bg-green-600">
-                    Gallery/
-                    <input
+                <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
+                  Camera
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handlePhotoUpload(e, 'Item')}
+                    className="hidden"
+                  />
+                </label>
+                <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
+                  Gallery
+                  <input
                     type="file"
                     accept="image/*"
                     multiple
                     onChange={(e) => handlePhotoUpload(e, 'Item')}
-                    onChange={(e=> handlePhotoOnChange(e, 'Gallery', 'Item')}
                     className="hidden"
                   />
-                  </label>
+                </label>
               </div>
-            }
             </div>
             <button
               onClick={createCollage}
@@ -513,27 +508,21 @@
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Collage Preview</h2>
                 <img src={collageUrl} alt="Collage" className="max-w-full h-auto mb-4" />
-                <div className="flex flex-row">
-                  <div className="flex space-x-4">
-                    <button
-                      onClick={saveAndShare}
-                      onClick={() => saveAndShare()}
-                      className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                      disabled={isSavingAndSharing}
-                    >
-                      {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
-                      {isSavingAndShare ? 'Saving & Shar...' : '...'}
-                      </button
-                    }/>
-                  </div>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => saveAndShare()}
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                    disabled={isSavingAndSharing}
+                  >
+                    {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      );
+              </div>
+            )}
+          </div>
+        );
+      }
 
-      const root = createRoot.getElementById('root'));
       const root = createRoot(document.getElementById('root'));
       root.render(
         <ErrorBoundary>
