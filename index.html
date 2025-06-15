@@ -189,8 +189,8 @@
             return;
           }
           const canvas = document.createElement('canvas');
-          canvas.width = 1000;
-          canvas.height = 800;
+          canvas.width = 950;
+          canvas.height = 750;
           canvasRef.current = canvas;
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#fff';
@@ -214,8 +214,8 @@
                 height = maxHeight;
                 width = height * aspect;
               }
-              const x = 200 + (maxWidth - width) / 2;
-              const y = 25 + (maxHeight - height) / 2;
+              const x = 175 + (maxWidth - width) / 2;
+              const y = 20 + (maxHeight - height) / 2;
               ctx.drawImage(img, x, y, width, height);
               ctx.strokeStyle = '#000';
               ctx.lineWidth = 4;
@@ -256,8 +256,8 @@
               img.onload = () => {
                 console.log('Item image loaded', index);
                 const positions = [
-                  [25, 525, 225, 225], [275, 525, 225, 225],
-                  [525, 525, 225, 225], [775, 525, 225, 225]
+                  [50, 500, 200, 200], [270, 500, 200, 200],
+                  [490, 500, 200, 200], [710, 500, 200, 200]
                 ];
                 const [x, y, maxWidth, maxHeight] = positions[index];
                 const aspect = img.width / img.height;
@@ -273,7 +273,6 @@
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(drawX, drawY, width, height);
-                ctx.fillText(`Item ${index + 1}`, drawX, drawY - 10);
                 loaded++;
                 if (loaded === maxItems) {
                   try {
@@ -372,7 +371,7 @@
             return;
           }
           setIsSharing(true);
-          const text = billNumber;
+          console.log('Sharing to WhatsApp with Bill Number:', billNumber);
           try {
             canvasRef.current.toBlob(blob => {
               try {
@@ -384,7 +383,7 @@
                 if (isMobile && navigator.share) {
                   navigator.share({
                     files: [file],
-                    text: text,
+                    text: billNumber,
                   }).then(() => {
                     console.log('WhatsApp share successful');
                   }).catch(error => {
@@ -444,6 +443,7 @@
               <input
                 type="file"
                 accept="image/*"
+                capture="environment"
                 onChange={(e) => handlePhotoUpload(e, 'Bill')}
                 className="mb-2"
               />
@@ -451,6 +451,7 @@
               <input
                 type="file"
                 accept="image/*"
+                capture="environment"
                 multiple
                 onChange={(e) => handlePhotoUpload(e, 'Item')}
                 className="mb-2"
