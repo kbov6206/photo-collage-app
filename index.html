@@ -44,7 +44,6 @@
       const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
       const SCOPES = 'https://www.googleapis.com/auth/drive.file';
       const FOLDER_ID = '1fBeZUVeb3P0WVYE06YCfDyU9hy_vC0mf';
-      const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/CdfCyB826p48jxRhvDFuGU';
 
       function App() {
         const [photos, setPhotos] = useState([]);
@@ -180,8 +179,8 @@
             return;
           }
           const canvas = document.createElement('canvas');
-          canvas.width = 1200;
-          canvas.height = 900;
+          canvas.width = 1000;
+          canvas.height = 800;
           canvasRef.current = canvas;
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#fff';
@@ -205,8 +204,8 @@
                 height = maxHeight;
                 width = height * aspect;
               }
-              const x = 300 + (maxWidth - width) / 2;
-              const y = 50 + (maxHeight - height) / 2;
+              const x = 200 + (maxWidth - width) / 2;
+              const y = 25 + (maxHeight - height) / 2;
               ctx.drawImage(img, x, y, width, height);
               ctx.strokeStyle = '#000';
               ctx.lineWidth = 4;
@@ -247,8 +246,8 @@
               img.onload = () => {
                 console.log('Item image loaded', index);
                 const positions = [
-                  [50, 600, 250, 250], [350, 600, 250, 250],
-                  [650, 600, 250, 250], [950, 600, 250, 250]
+                  [25, 525, 225, 225], [275, 525, 225, 225],
+                  [525, 525, 225, 225], [775, 525, 225, 225]
                 ];
                 const [x, y, maxWidth, maxHeight] = positions[index];
                 const aspect = img.width / img.height;
@@ -355,7 +354,7 @@
             return;
           }
           setIsSharing(true);
-          const text = `Check out this collage! Please share in the group: ${WHATSAPP_GROUP_LINK}`;
+          const text = 'Check out this collage!';
           try {
             canvasRef.current.toBlob(blob => {
               try {
@@ -363,7 +362,8 @@
                   throw new Error('Failed to convert canvas to blob');
                 }
                 const file = new File([blob], 'collage.jpg', { type: 'image/jpeg' });
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+                const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+                if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                   navigator.share({
                     files: [file],
                     text: text,
@@ -382,32 +382,12 @@
                     setIsSharing(false);
                   });
                 } else {
-                  // Fallback to WhatsApp deep-link
-                  const encodedText = encodeURIComponent(text);
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const base64data = reader.result.split(',')[1];
-                    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
-                    window.open(whatsappUrl, '_blank');
-                    setTimeout(() => {
-                      alert('Please select the group in WhatsApp and attach the downloaded collage.');
-                      const link = document.createElement('a');
-                      link.href = collageUrl;
-                      link.download = 'collage.jpg';
-                      link.click();
-                      setIsSharing(false);
-                    }, 1000);
-                  };
-                  reader.onerror = () => {
-                    console.error('Failed to read blob for WhatsApp');
-                    alert('Failed to share to WhatsApp. Downloading collage for manual sharing.');
-                    const link = document.createElement('a');
-                    link.href = collageUrl;
-                    link.download = 'collage.jpg';
-                    link.click();
-                    setIsSharing(false);
-                  };
-                  reader.readAsDataURL(blob);
+                  alert('WhatsApp sharing not supported. Downloading collage for manual sharing.');
+                  const link = document.createElement('a');
+                  link.href = collageUrl;
+                  link.download = 'collage.jpg';
+                  link.click();
+                  setIsSharing(false);
                 }
               } catch (error) {
                 console.error('WhatsApp sharing error:', error);
@@ -434,14 +414,14 @@
           <div className="p-4 max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold mb-4">Photo Collage App</h1>
             <div className="mb-4">
-              <label className="block mb-2">Upload Bill Photo (Camera or Gallery):</label>
+              <label className="block mb-2">Bill Photo (Camera or Gallery):</label>
               <input
                 type="file"
                 accept="image/*"
                 onChange={(e) => handlePhotoUpload(e, 'Bill')}
                 className="mb-2"
               />
-              <label className="block mb-2">Upload Item Photos (Camera or Gallery, Multiple Allowed):</label>
+              <label className="block mb-2">Item Photos (Camera or Gallery, Multiple Allowed):</label>
               <input
                 type="file"
                 accept="image/*"
