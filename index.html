@@ -196,8 +196,8 @@
             return;
           }
           const canvas = document.createElement('canvas');
-          canvas.width = 950;
-          canvas.height = 750;
+          canvas.width = 500;
+          canvas.height = 950;
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = '#fff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -212,21 +212,21 @@
             img.onload = () => {
               console.log('Bill image loaded');
               const aspect = img.width / img.height;
-              const maxWidth = 600;
-              const maxHeight = 450;
+              const maxWidth = 460; // 500 - 20px left - 20px right
+              const maxHeight = 345; // Maintain ~4:3 ratio
               let width = maxWidth;
               let height = width / aspect;
               if (height > maxHeight) {
                 height = maxHeight;
                 width = height * aspect;
               }
-              const x = 175 + (maxWidth - width) / 2;
-              const y = 30 + (maxHeight - height) / 2;
+              const x = (canvas.width - width) / 2; // Center horizontally
+              const y = 36; // Increased top padding (30 * 1.2)
               ctx.drawImage(img, x, y, width, height);
               ctx.strokeStyle = '#000';
               ctx.lineWidth = 4;
               ctx.strokeRect(x, y, width, height);
-              ctx.fillText(billNumber, x, y - 15);
+              ctx.fillText(billNumber, x, y - 15); // Caption at y=21
               drawItems(canvas, ctx);
             };
             img.onerror = () => {
@@ -258,6 +258,7 @@
           }
           let loaded = 0;
           const maxItems = Math.min(items.length, 4);
+          const itemHeight = (950 - 36 - 345 - 20 - (maxItems - 1) * 10) / maxItems; // Distribute remaining height
           items.forEach((item, index) => {
             if (index < 4) {
               const img = new Image();
@@ -265,11 +266,8 @@
               img.crossOrigin = 'Anonymous';
               img.onload = () => {
                 console.log('Item image loaded', index);
-                const positions = [
-                  [50, 500, 200, 200], [270, 500, 200, 200],
-                  [490, 500, 200, 200], [710, 500, 200, 200]
-                ];
-                const [x, y, maxWidth, maxHeight] = positions[index];
+                const maxWidth = 460; // 500 - 20px left - 20px right
+                const maxHeight = itemHeight; // Dynamic height per item
                 const aspect = img.width / img.height;
                 let width = maxWidth;
                 let height = width / aspect;
@@ -277,12 +275,12 @@
                   height = maxHeight;
                   width = height * aspect;
                 }
-                const drawX = x + (maxWidth - width) / 2;
-                const drawY = y + (maxHeight - height) / 2;
-                ctx.drawImage(img, drawX, drawY, width, height);
+                const x = (canvas.width - width) / 2; // Center horizontally
+                const y = 36 + 345 + 10 + index * (itemHeight + 10); // Stack vertically
+                ctx.drawImage(img, x, y, width, height);
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 4;
-                ctx.strokeRect(drawX, drawY, width, height);
+                ctx.strokeRect(x, y, width, height);
                 loaded++;
                 if (loaded === maxItems) {
                   try {
