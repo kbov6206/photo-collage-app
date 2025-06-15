@@ -215,12 +215,12 @@
                 width = height * aspect;
               }
               const x = 175 + (maxWidth - width) / 2;
-              const y = 20 + (maxHeight - height) / 2;
+              const y = 30 + (maxHeight - height) / 2;
               ctx.drawImage(img, x, y, width, height);
               ctx.strokeStyle = '#000';
               ctx.lineWidth = 4;
               ctx.strokeRect(x, y, width, height);
-              ctx.fillText(billNumber, x, y - 10);
+              ctx.fillText(billNumber, x, y - 15);
               drawItems(canvas, ctx);
             };
             img.onerror = () => {
@@ -429,52 +429,82 @@
 
         return (
           <div className="p-4 max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-4">Photo Collage App</h1>
-            <div className="mb-4">
-              <label className="block mb-2">Bill Number:</label>
+            <h1 className="text-2xl font-bold mb-6">Photo Collage App</h1>
+            <div className="mb-6">
+              <label className="block mb-2 font-medium">Bill Number:</label>
               <input
                 type="text"
                 value={billNumber}
                 onChange={(e) => setBillNumber(e.target.value)}
-                className="w-full p-2 border rounded mb-2"
+                className="w-full p-2 border rounded mb-4"
                 placeholder="Enter bill number"
               />
-              <label className="block mb-2">Bill Photo (Camera or Gallery):</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => handlePhotoUpload(e, 'Bill')}
-                className="mb-2"
-              />
-              <label className="block mb-2">Item Photos (Camera or Gallery, Multiple Allowed):</label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => handlePhotoUpload(e, 'Item')}
-                className="mb-2"
-              />
+              <label className="block mb-2 font-medium">Bill Photo:</label>
+              <div className="flex space-x-4 mb-4">
+                <label className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600">
+                  Camera
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handlePhotoUpload(e, 'Bill')}
+                    className="hidden"
+                  />
+                </label>
+                <label className="bg-blue-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-blue-600">
+                  Gallery
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handlePhotoUpload(e, 'Bill')}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              <label className="block mb-2 font-medium">Item Photos (Multiple Allowed for Gallery):</label>
+              <div className="flex space-x-4 mb-4">
+                <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
+                  Camera
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => handlePhotoUpload(e, 'Item')}
+                    className="hidden"
+                  />
+                </label>
+                <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
+                  Gallery
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => handlePhotoUpload(e, 'Item')}
+                    className="hidden"
+                  />
+                </label>
+              </div>
             </div>
             <button
               onClick={createCollage}
-              className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6"
             >
               Create Collage
             </button>
             {collageUrl && (
-              <div className="mb-4">
-                <h2 className="text-xl font-semibold">Collage Preview</h2>
-                <img src={collageUrl} alt="Collage" className="max-w-full h-auto" />
-                <div className="mt-4 space-x-4">
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold mb-2">Collage Preview</h2>
+                <img src={collageUrl} alt="Collage" className="max-w-full h-auto mb-4" />
+                <div className="flex space-x-4">
                   <button
                     onClick={uploadToDrive}
-                    className="bg-green-500 text-white px-4 py-2 rounded"
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
                   >
                     Upload to Drive
                   </button>
                   <button
                     onClick={shareToWhatsApp}
-                    className="bg-green-500 text-white px-4 py-2 rounded"
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
                     disabled={isSharing}
                   >
                     {isSharing ? 'Sharing...' : 'Share to WhatsApp'}
