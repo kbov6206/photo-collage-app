@@ -3,271 +3,299 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' [invalid url, do not cite] [invalid url, do not cite] [invalid url, do not cite] [invalid url, do not cite] 'unsafe-inline'; style-src 'self' 'unsafe-inline' [invalid url, do not cite]; img-src 'self' data:; connect-src 'self' [invalid url, do not cite] [invalid url, do not cite] frame-src [invalid url, do not cite] [invalid url, do not cite]">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
-  <script src="[invalid url, do not cite]"></script>
-  <script src="[invalid url, do not cite]/react@18/umd/react.development.js"></script>
-  <script src="[invalid url, do not cite]/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="[invalid url, do not cite]/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
-  <script src="[invalid url, do not cite] async defer></script>
-  <script src="[invalid url, do not cite] async defer></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
   <div id="root" class="min-h-screen bg-gray-100"></div>
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
-    const { createRoot } = ReactDOM;
+    try {
+      const { useState, useEffect, useRef } = React;
+      const { createRoot } = ReactDOM;
 
-    // Google Drive API Configuration
-    const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
-    const API_KEY = 'AIzaSyBDCNxfd_hjhAVk0lFcgaoTvZrHbQOAhAY';
-    const DISCOVERY_DOCS = ['[invalid url, do not cite]/discovery/v1/apis/drive/v3/rest'];
-    const SCOPES = '[invalid url, do not cite]/auth/drive.file';
-    const FOLDER_ID = '1fBeZUVeb3P0WVYE06YCfDyU9hy_vC0mf';
-    const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/CdfCyB826p48jxRhvDFuGU';
-    function App() {
-      const [photos, setPhotos] = useState([]);
-      const [collageUrl, setCollageUrl] = useState(null);
-      const [gapiReady, setGapiReady] = useState(false);
-      const tokenClientRef = useRef(null);
+      // Google Drive API Configuration
+      const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
+      const API_KEY = 'AIzaSyBDCNxfd_hjhAVk0lFcgaoTvZrHbQOAhAY';
+      const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
+      const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+      const FOLDER_ID = '1fBeZUVeb3P0WVYE06YCfDyU9hy_vC0mf';
+      const WHATSAPP_GROUP_LINK = 'https://chat.whatsapp.com/CdfCyB826p48jxRhvDFuGU';
 
-      // Initialize Google API Client
-      useEffect(() => {
-        window.gapi.load('client', () => {
-          window.gapi.client.init({
-            apiKey: API_KEY,
-            discoveryDocs: DISCOVERY_DOCS,
-          }).then(() => {
-            setGapiReady(true);
-            tokenClientRef.current = google.accounts.oauth2.initTokenClient({
-              client_id: CLIENT_ID,
-              scope: SCOPES,
-              callback: (tokenResponse) => {
-                if (tokenResponse && tokenResponse.access_token) {
-                  window.gapi.client.setToken(tokenResponse);
-                } else {
-                  console.error('Token response error:', tokenResponse);
-                }
-              },
-            });
-          }).catch(error => console.error('GAPI client init error:', error));
-        });
-      }, []);
+      function App() {
+        const [photos, setPhotos] = useState([]);
+        const [collageUrl, setCollageUrl] = useState(null);
+        const [gapiReady, setGapiReady] = useState(false);
+        const tokenClientRef = useRef(null);
 
-      // Get access token
-      const getAccessToken = () => {
-        return new Promise((resolve, reject) => {
-          if (!tokenClientRef.current) {
-            reject('Token client not initialized');
+        // Initialize Google API Client
+        useEffect(() => {
+          window.gapi.load('client', () => {
+            window.gapi.client.init({
+              apiKey: API_KEY,
+              discoveryDocs: DISCOVERY_DOCS,
+            }).then(() => {
+              setGapiReady(true);
+              tokenClientRef.current = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: (tokenResponse) => {
+                  if (tokenResponse && tokenResponse.access_token) {
+                    window.gapi.client.setToken(tokenResponse);
+                  } else {
+                    console.error('Token response error:', tokenResponse);
+                  }
+                },
+              });
+            }).catch(error => console.error('GAPI client init error:', error));
+          });
+        }, []);
+
+        // Get access token
+        const getAccessToken = () => {
+          return new Promise((resolve, reject) => {
+            if (!tokenClientRef.current) {
+              reject('Token client not initialized');
+              return;
+            }
+            tokenClientRef.current.callback = (tokenResponse) => {
+              if (tokenResponse && tokenResponse.access_token) {
+                window.gapi.client.setToken(tokenResponse);
+                resolve(tokenResponse.access_token);
+              } else {
+                reject('Failed to get access token');
+              }
+            };
+            tokenClientRef.current.requestAccessToken();
+          });
+        };
+
+        // Handle photo upload
+        const handlePhotoUpload = (e, category) => {
+          const files = e.target.files;
+          if (files) {
+            if (category === 'Bill') {
+              const file = files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  setPhotos(prevPhotos => {
+                    const withoutBill = prevPhotos.filter(p => p.category !== 'Bill');
+                    return [...withoutBill, { url: reader.result, category }];
+                  });
+                };
+                reader.onerror = () => {
+                  console.error('Error reading bill file');
+                  alert('Failed to read bill photo. Please try another image.');
+                };
+                reader.readAsDataURL(file);
+              }
+            } else {
+              Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  setPhotos(prevPhotos => [...prevPhotos, { url: reader.result, category }]);
+                };
+                reader.onerror = () => {
+                  console.error('Error reading item file');
+                  alert('Failed to read item photo. Please try another image.');
+                };
+                reader.readAsDataURL(file);
+              });
+            }
+          }
+        };
+
+        // Create collage
+        const createCollage = () => {
+          console.log('Creating collage with photos:', photos);
+          if (photos.length === 0) {
+            alert('Please upload at least one photo.');
             return;
           }
-          tokenClientRef.current.callback = (tokenResponse) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              window.gapi.client.setToken(tokenResponse);
-              resolve(tokenResponse.access_token);
-            } else {
-              reject('Failed to get access token');
-            }
-          };
-          tokenClientRef.current.requestAccessToken();
-        });
-      };
+          const canvas = document.createElement('canvas');
+          canvas.width = 800;
+          canvas.height = 600;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Handle photo upload
-      const handlePhotoUpload = (e, category) => {
-        const files = e.target.files;
-        if (files) {
-          if (category === 'Bill') {
-            const file = files[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = () => {
-                setPhotos(prevPhotos => {
-                  const withoutBill = prevPhotos.filter(p => p.category !== 'Bill');
-                  return [...withoutBill, { url: reader.result, category }];
-                });
-              };
-              reader.readAsDataURL(file);
-            }
-          } else {
-            Array.from(files).forEach(file => {
-              const reader = new FileReader();
-              reader.onload = () => {
-                setPhotos(prevPhotos => [...prevPhotos, { url: reader.result, category }]);
-              };
-              reader.readAsDataURL(file);
-            });
-          }
-        }
-      };
-
-      // Create collage
-      const createCollage = () => {
-        console.log('Creating collage with photos:', photos);
-        if (photos.length === 0) {
-          alert('Please upload at least one photo.');
-          return;
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 600;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const bill = photos.find(p => p.category === 'Bill');
-        if (bill) {
-          const img = new Image();
-          img.src = bill.url;
-          img.onload = () => {
-            console.log('Bill image loaded');
-            ctx.drawImage(img, 200, 50, 400, 300);
-            drawItems(canvas, ctx);
-          };
-          img.onerror = () => {
-            console.error('Failed to load bill image');
-            drawItems(canvas, ctx);
-          };
-        } else {
-          drawItems(canvas, ctx);
-        }
-      };
-
-      // Draw items
-      const drawItems = (canvas, ctx) => {
-        const items = photos.filter(p => p.category === 'Item');
-        console.log('Drawing items:', items.length);
-        if (items.length === 0) {
-          setCollageUrl(canvas.toDataURL('image/jpeg'));
-          return;
-        }
-        let loaded = 0;
-        items.forEach((item, index) => {
-          if (index < 4) {
+          const bill = photos.find(p => p.category === 'Bill');
+          if (bill) {
             const img = new Image();
-            img.src = item.url;
+            img.src = bill.url;
+            img.crossOrigin = 'Anonymous'; // Prevent tainted canvas
             img.onload = () => {
-              console.log('Item image loaded', index);
-              const positions = [
-                [50, 400, 150, 150], [250, 400, 150, 150],
-                [450, 400, 150, 150], [650, 400, 150, 150]
-              ];
-              ctx.drawImage(img, ...positions[index]);
-              loaded++;
-              if (loaded === items.length || loaded === 4) {
-                setCollageUrl(canvas.toDataURL('image/jpeg'));
-              }
+              console.log('Bill image loaded');
+              ctx.drawImage(img, 200, 50, 400, 300);
+              drawItems(canvas, ctx);
             };
             img.onerror = () => {
-              console.error('Failed to load item image', index);
-              loaded++;
-              if (loaded === items.length || loaded === 4) {
-                setCollageUrl(canvas.toDataURL('image/jpeg'));
-              }
+              console.error('Failed to load bill image');
+              alert('Failed to load bill image. Please try another image.');
+              drawItems(canvas, ctx);
             };
+          } else {
+            drawItems(canvas, ctx);
           }
-        });
-      };
+        };
 
-      // Upload to Google Drive
-      const uploadToDrive = async () => {
-        if (!gapiReady || !collageUrl) {
-          alert('Please create a collage first.');
-          return;
-        }
-        try {
-          await getAccessToken();
-          const blob = await (await fetch(collageUrl)).blob();
-          const metadata = {
-            name: `collage_${new Date().toISOString()}.jpg`,
-            mimeType: 'image/jpeg',
-            parents: [FOLDER_ID],
-          };
-          const form = new FormData();
-          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-          form.append('file', blob);
-          const response = await window.gapi.client.request({
-            path: '/upload/drive/v3/files',
-            method: 'POST',
-            params: { uploadType: 'multipart' },
-            body: form,
+        // Draw items
+        const drawItems = (canvas, ctx) => {
+          const items = photos.filter(p => p.category === 'Item');
+          console.log('Drawing items:', items.length);
+          if (items.length === 0) {
+            setCollageUrl(canvas.toDataURL('image/jpeg'));
+            return;
+          }
+          let loaded = 0;
+          const maxItems = Math.min(items.length, 4);
+          items.forEach((item, index) => {
+            if (index < 4) {
+              const img = new Image();
+              img.src = item.url;
+              img.crossOrigin = 'Anonymous'; // Prevent tainted canvas
+              img.onload = () => {
+                console.log('Item image loaded', index);
+                const positions = [
+                  [50, 400, 150, 150], [250, 400, 150, 150],
+                  [450, 400, 150, 150], [650, 400, 150, 150]
+                ];
+                ctx.drawImage(img, ...positions[index]);
+                loaded++;
+                if (loaded === maxItems) {
+                  try {
+                    setCollageUrl(canvas.toDataURL('image/jpeg'));
+                  } catch (error) {
+                    console.error('Canvas tainted error:', error);
+                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                  }
+                }
+              };
+              img.onerror = () => {
+                console.error('Failed to load item image', index);
+                alert('Failed to load item image ' + (index + 1) + '. Skipping.');
+                loaded++;
+                if (loaded === maxItems) {
+                  try {
+                    setCollageUrl(canvas.toDataURL('image/jpeg'));
+                  } catch (error) {
+                    console.error('Canvas tainted error:', error);
+                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                  }
+                }
+              };
+            }
           });
-          alert('Uploaded to Google Drive!');
-        } catch (error) {
-          console.error('Upload error:', error);
-          alert('Failed to upload to Google Drive: ' + (error.message || error));
-        }
-      };
+        };
 
-      // Share to WhatsApp
-      const shareToWhatsApp = () => {
-        if (!collageUrl) {
-          alert('Please create a collage first.');
-          return;
-        }
-        const text = `Check out this collage!`;
-        const encodedText = encodeURIComponent(text);
-        const link = `[invalid url, do not cite]).pop()}`;
-        try {
-          window.open(link, '_blank');
-        } catch (error) {
-          console.error('WhatsApp sharing error:', error);
-          alert('Failed to open WhatsApp. Please check the group link or try again.');
-        }
-      };
+        // Upload to Google Drive
+        const uploadToDrive = async () => {
+          if (!gapiReady || !collageUrl) {
+            alert('Please create a collage first.');
+            return;
+          }
+          try {
+            await getAccessToken();
+            const blob = await (await fetch(collageUrl)).blob();
+            const metadata = {
+              name: `collage_${new Date().toISOString()}.jpg`,
+              mimeType: 'image/jpeg',
+              parents: [FOLDER_ID],
+            };
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', blob);
+            const response = await window.gapi.client.request({
+              path: '/upload/drive/v3/files',
+              method: 'POST',
+              params: { uploadType: 'multipart' },
+              body: form,
+            });
+            alert('Uploaded to Google Drive!');
+          } catch (error) {
+            console.error('Upload error:', error);
+            alert('Failed to upload to Google Drive: ' + (error.message || error));
+          }
+        };
 
-      // Handle send button
-      const handleSend = async () => {
-        await uploadToDrive();
-        shareToWhatsApp();
-      };
+        // Share to WhatsApp
+        const shareToWhatsApp = () => {
+          if (!collageUrl) {
+            alert('Please create a collage first.');
+            return;
+          }
+          const text = `Check out this collage!`;
+          const encodedText = encodeURIComponent(text);
+          const groupInviteCode = WHATSAPP_GROUP_LINK.split('/').pop();
+          const link = `https://api.whatsapp.com/send?phone=&text=${encodedText}&group_invite=${groupInviteCode}`;
+          try {
+            window.open(link, '_blank');
+          } catch (error) {
+            console.error('WhatsApp sharing error:', error);
+            alert('Failed to open WhatsApp. Please check the group link or try again.');
+          }
+        };
 
-      return (
-        <div className="p-4 max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold mb-4">Photo Collage App</h1>
-          <div className="mb-4">
-            <label className="block mb-2">Upload Bill Photo:</label>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => handlePhotoUpload(e, 'Bill')}
-              className="mb-2"
-            />
-            <label className="block mb-2">Upload Item Photos:</label>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              onChange={(e) => handlePhotoUpload(e, 'Item')}
-              className="mb-2"
-            />
-          </div>
-          <button
-            onClick={createCollage}
-            className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
-          >
-            Create Collage
-          </button>
-          {collageUrl && (
+        // Handle send button
+        const handleSend = async () => {
+          await uploadToDrive();
+          shareToWhatsApp();
+        };
+
+        return (
+          <div className="p-4 max-w-4xl mx-auto">
+            <h1 className="text-2xl font-bold mb-4">Photo Collage App</h1>
             <div className="mb-4">
-              <h2 className="text-xl font-semibold">Collage Preview</h2>
-              <img src={collageUrl} alt="Collage" className="max-w-full h-auto" />
-              <button
-                onClick={handleSend}
-                className="bg-green-500 text-white px-4 py-2 rounded mt-4"
-              >
-                Send
-              </button>
+              <label className="block mb-2">Upload Bill Photo (Camera or File):</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handlePhotoUpload(e, 'Bill')}
+                className="mb-2"
+              />
+              <label className="block mb-2">Upload Item Photos (Camera or Files, Multiple Allowed):</label>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                onChange={(e) => handlePhotoUpload(e, 'Item')}
+                className="mb-2"
+              />
             </div>
-          )}
-        </div>
-      );
-    }
+            <button
+              onClick={createCollage}
+              className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
+            >
+              Create Collage
+            </button>
+            {collageUrl && (
+              <div className="mb-4">
+                <h2 className="text-xl font-semibold">Collage Preview</h2>
+                <img src={collageUrl} alt="Collage" className="max-w-full h-auto" />
+                <button
+                  onClick={handleSend}
+                  className="bg-green-500 text-white px-4 py-2 rounded mt-4"
+                >
+                  Send
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      }
 
-    const root = createRoot(document.getElementById('root'));
-    root.render(<App />);
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    } catch (error) {
+      console.error('Rendering error:', error);
+    }
   </script>
 </body>
 </html>
