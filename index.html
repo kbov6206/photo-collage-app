@@ -365,17 +365,19 @@
           if (!billNumber.trim()) {
             throw new Error('Please enter a Bill Number.');
           }
-          console.log('Preparing to share with Bill Number:', billNumber); // Debug caption
+          console.log('Preparing to share with Bill Number:', billNumber);
           return new Promise((resolve, reject) => {
             try {
               canvasRef.current.toBlob(blob => {
                 try {
                   if (!blob) {
+                    console.error('Blob conversion failed');
                     throw new Error('Failed to convert canvas to blob');
                   }
+                  console.log('Blob created, size:', blob.size, 'type:', blob.type);
                   const file = new File([blob], `${sanitizeFilename(billNumber)}.jpg`, { type: 'image/jpeg' });
                   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-                  if (isMobile && navigator.share) {
+                  if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                     console.log('Initiating navigator.share with Bill Number:', billNumber);
                     navigator.share({
                       files: [file],
@@ -384,19 +386,15 @@
                       console.log('Browser share successful');
                       resolve(true);
                     }).catch(error => {
-                      console.error('Navigator share error:', error);
+                      console.error('Navigator share error:', error, 'Message:', error.message);
                       if (error.name !== 'AbortError') {
-                        reject(new Error('Failed to share to WhatsApp. Downloading collage for manual sharing.'));
-                        const link = document.createElement('a');
-                        link.href = collageUrl;
-                        link.download = `${sanitizeFilename(billNumber)}.jpg`;
-                        link.click();
+                        reject(new Error(`Failed to share to WhatsApp: ${error.message || 'Unknown share error'}`));
                       } else {
                         resolve(false); // User canceled share
                       }
                     });
                   } else {
-                    console.log('Browser sharing not supported, downloading');
+                    console.log('Browser sharing not supported or cannot share file, downloading');
                     const link = document.createElement('a');
                     link.href = collageUrl;
                     link.download = `${sanitizeFilename(billNumber)}.jpg`;
@@ -404,13 +402,13 @@
                     resolve(false);
                   }
                 } catch (error) {
-                  console.error('Browser sharing error:', error);
-                  reject(error);
+                  console.error('Share processing error:', error);
+                  reject(new Error(`Share processing error: ${error.message || 'Unknown error'}`));
                 }
               }, 'image/jpeg', 0.9);
             } catch (error) {
-              console.error('Browser sharing error:', error);
-              reject(error);
+              console.error('Share initialization error:', error);
+              reject(new Error(`Share initialization error: ${error.message || 'Unknown error'}`));
             }
           });
         };
@@ -437,7 +435,7 @@
                 alert('WhatsApp sharing not supported or canceled. Collage downloaded for manual sharing.');
               }
             } catch (shareError) {
-              alert('Failed to share to WhatsApp: ' + (shareError.message || 'Unknown error') + '. Collage downloaded for manual sharing.');
+              alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Collage downloaded for manual sharing.`);
             }
           } finally {
             setIsSavingAndSharing(false);
