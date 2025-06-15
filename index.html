@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://apis.google.com data:; frame-src https://content.googleapis.com https://accounts.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src; 'self' script-src='https://cdn.tailwindcss.com' https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src='self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src='self' data:; connect-src='self' https://www.googleapis.com https://accounts.google.com https://apis.google.com; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -20,7 +20,7 @@
       const { createRoot } = ReactDOM;
 
       // Error Boundary Component
-      class ErrorBoundary extends Component {
+ class ErrorBoundary extends Component {
         state = { hasError: false, error: null };
         static getDerivedStateFromError(error) {
           return { hasError: true, error };
@@ -388,7 +388,7 @@
                     }).catch(error => {
                       console.error('Navigator share error:', error, 'Message:', error.message);
                       if (error.name !== 'AbortError') {
-                        reject(new Error(`Failed to share to WhatsApp: ${error.message || 'Unknown share error'}`));
+                        reject(new Error(`Failed to share: ${error.message || 'Unknown share error'}`));
                       } else {
                         resolve(false); // User canceled share
                       }
@@ -413,29 +413,32 @@
           });
         };
 
-        // Save and Share (Drive then WhatsApp)
+        // Save and Share (WhatsApp then Drive)
         const saveAndShare = async () => {
           if (isSavingAndSharing) {
             alert('Please wait for the previous operation to complete.');
             return;
           }
           setIsSavingAndSharing(true);
+          let shareErrorMessage = null;
           try {
-            // Step 1: Upload to Google Drive
-            try {
-              const fileId = await uploadToDrive();
-              alert(`Uploaded to Google Drive! File ID: ${fileId}`);
-            } catch (driveError) {
-              alert('Failed to upload to Google Drive: ' + (driveError.message || 'Unknown error') + '. Proceeding to share.');
-            }
-            // Step 2: Share to WhatsApp via browser
+            // Step 1: Share to WhatsApp via browser (within user gesture)
             try {
               const shared = await shareToBrowser();
               if (!shared) {
-                alert('WhatsApp sharing not supported or canceled. Collage downloaded for manual sharing.');
+                console.log('Sharing not completed, proceeding to Drive upload');
               }
             } catch (shareError) {
-              alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Collage downloaded for manual sharing.`);
+              shareErrorMessage = `Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}.`;
+              console.error('Share error captured:', shareErrorMessage);
+            }
+
+            // Step 2: Upload to Google Drive
+            try {
+              const fileId = await uploadToDrive();
+              alert(`Uploaded to Google Drive! File ID: ${fileId}${shareErrorMessage ? '\n' + shareErrorMessage : ''}`);
+            } catch (driveError) {
+              alert(`Failed to upload to Google Drive: ${driveError.message || 'Unknown error'}.${shareErrorMessage ? '\n' + shareErrorMessage : ''}`);
             }
           } finally {
             setIsSavingAndSharing(false);
