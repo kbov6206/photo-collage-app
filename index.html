@@ -553,7 +553,7 @@
 
               if (bestBin) {
                 // Maximize image size within bin
-                const scaleFactor = Math.min(bin.width / bestWidth, bin.height / bestHeight, 1.2); // Limit upscale
+                const scaleFactor = Math.min(bestBin.width / bestWidth, bestBin.height / bestHeight, 1.2); // Limit upscale
                 bestWidth *= scaleFactor;
                 bestHeight *= scaleFactor;
                 // Place item in the best bin
