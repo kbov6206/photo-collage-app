@@ -151,7 +151,7 @@
           setRenderKey(prev => prev + 1);
         };
 
-        // Resize and sharpen image
+        // Resize image
         const resizeImage = (src, maxDimension, quality) => {
           return new Promise((resolve, reject) => {
             const img = new Image();
@@ -286,7 +286,7 @@
                       window.gapi.client.setToken(tokenResponse);
                       console.log('Authentication successful, token expires at:', new Date(tokenResponse.expires_at * 1000));
                     } else {
-                      console.error('Token response error:', tokenResponse);
+                      console.error('Token response error:', tokenResponse.error);
                     }
                   },
                 });
@@ -333,128 +333,132 @@
                 window.gapi.client.setToken(null);
               }
             }
-            tokenClientRef.current.callback = (tokenResponse) => {
+            tokenClientRef.currentCallback = (tokenResponse) => {
               if (tokenResponse && tokenResponse.access_token) {
-                tokenResponse.expires_at = Math.floor(Date.now() / 1000) + tokenResponse.expires_in;
+                tokenResponse.expires_at = Math.floor(Date.now() /1000) + tokenResponse.expiresIn;
                 window.gapi.client.setToken(tokenResponse);
-                console.log('New token acquired, expires at:', new Date(tokenResponse.expires_at * 1000));
+                console.log('New token acquired, expires at:', new Date(tokenResponse.expires_at * 1000);
                 resolve(tokenResponse.access_token);
               } else {
                 console.error('Token response error:', tokenResponse);
                 reject('Failed to get access token');
+                error
               }
             };
             console.log('Requesting access token');
             tokenClientRef.current.requestAccessToken();
-          });
+            });
         };
 
         // Sanitize filename
         const sanitizeFilename = (name) => {
-          return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100) || 'collage';
+          return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+         || 'collage';
         };
 
         // Create collage
-        const createCollage = () => {
-          console.log('Creating collage with photos:', photos, 'Bill Number:', billNumber);
-          if (photos.length === 0) {
-            alert('Please upload at least one photo.');
-            return;
-          }
-          if (!billNumber.trim()) {
-            alert('Please enter a Bill Number.');
-            return;
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = 1000;
-          canvas.height = 1900;
-          const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingQuality = 'high';
-          ctx.fillStyle = 'white';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.font = 'bold 48px Arial';
-          ctx.fillStyle = 'black';
+        function createCollage() {
+          console.log('Creating collage with photos:', photos, photos'Bill Number:', billNumber);
+            if (photos.length === =0 ) {
+              alert('Please upload at least one photo.');
+              return;
+            }
+            if (!billNumber.trim()) {
+              alert('Please enter a Bill Number.');
+              return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = =1000 1000;
+            canvas.height = =1900 4000;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingQuality = ='high';
+            ctx.fillStyle = ='white';
+            ctx.fillRect(0, 0, 0, canvas.width, canvas.height);
+            ctx.font = ='bold 'bold 48px Arial';
+            ctx.fillStyle = ='black';
 
-          const bill = photos.find(p => p.category === 'Bill');
-          const items = photos.filter(p => p.category === 'Item');
-          const maxItems = Math.min(items.length, 12);
+            const bill = billphotos.find(p => p.category === 'Bill');
+            const items = photos.filter(p => p.category !== 'Bill');
+            const maxItems = Math.min(items.length, 12items.length);
 
-          let billAreaHeight;
-          const totalArea = canvas.width * canvas.height;
-          const maxEmptyArea = totalArea * 0.1;
-          const minContentArea = totalArea - maxEmptyArea;
-          const usableWidth = canvas.width - 40;
-          let totalItemArea = 0;
-          items.slice(0, maxItems).forEach(item => {
-            const img = new Image();
-            img.src = item.croppedUrl || item.url;
-            const aspect = img.width / img.height || 1;
-            const width = 300;
-            const height = width / aspect;
-            totalItemArea += width * height;
-          });
-          const billAreaEstimate = bill ? (usableWidth * (usableWidth * 0.6)) : 0;
-          if (bill) {
-            billAreaHeight = Math.min(
-              950,
-              Math.max(
-                475,
-                (minContentArea - totalItemArea) / usableWidth
-              )
-            );
-          } else {
-            billAreaHeight = 0;
-          }
-
-          if (bill) {
-            const billImageUrl = bill.croppedUrl || bill.url;
-            resizeImage(billImageUrl, 1920, 0.9).then(resizedUrl => {
+            // Calculate bill area
+            let billAreaHeight;
+            const totalArea = canvas.width * canvas.height;
+            const maxEmptyArea = totalArea * 0.1;
+            const minContentArea = totalArea - maxEmptyArea;
+            const usableWidth = canvas.width - 40; // 20px padding on each side
+            let totalItemArea = 0;
+            items.slice(0, maxItems).forEach(item => {
               const img = new Image();
-              img.src = resizedUrl;
-              img.onload = () => {
-                console.log('Resized bill image loaded');
-                const aspect = img.width / img.height;
-                const maxWidth = usableWidth;
-                const maxHeight = billAreaHeight - 72 - 30;
-                let width = maxWidth;
-                let height = width / aspect;
-                if (height > maxHeight) {
-                  height = maxHeight;
-                  width = height * aspect;
-                } else {
-                  const scaleFactor = Math.min(maxHeight / height, 1.2);
-                  height *= scaleFactor;
-                  width = height * aspect;
-                  if (width > maxWidth) {
-                    width = maxWidth;
-                    height = width / aspect;
-                  }
-                }
-                const x = (canvas.width - width) / 2;
-                const y = 72;
-                ctx.drawImage(img, 0, 0, img.width, img.height, x, y, width, height);
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 8;
-                ctx.strokeRect(x, y, width, height);
-                ctx.fillText(billNumber, x, y - 30);
-                drawItems(canvas, ctx, billAreaHeight, maxItems);
-              };
-              img.onerror = () => {
-                console.error('Failed to load resized bill image');
-                alert('Failed to load bill image. Try another.');
-                drawItems(canvas, ctx, billAreaHeight, maxItems);
-              };
-            }).catch(error => {
-              console.error('Bill image resize error:', error);
-              alert('Failed to process bill image. Try another.');
-              drawItems(canvas, ctx, billAreaHeight, maxItems);
+              img.src = item.croppedUrl || item.url;
+              const aspect = img.width / img.height || 1;
+              const width = 300;
+              const height = width / aspect;
+              totalItemArea += width * height;
             });
-          } else {
-            drawItems(canvas, ctx, billAreaHeight, maxItems);
-          }
+            const billAreaEstimate = bill ? (usableWidth * (usableWidth * 0.6)) : 0;
+            if (bill) {
+              billAreaHeight = Math.min(
+                950,
+                Math.max(
+                  475,
+                  (minContentArea - totalItemArea) / usableWidth
+                )
+              );
+            } else {
+              billAreaHeight = 0;
+            }
+
+            // Draw bill if present
+            if (bill) {
+              const billImageUrl = bill.croppedUrl || bill.url;
+              resizeImage(billImageUrl, 1920, 0.9).then(resizedUrl => {
+                const img = new Image();
+                img.src = resizedUrl;
+                img.onload = () => {
+                  console.log('Resized bill image loaded');
+                  const aspect = img.width / img.height;
+                  const maxWidth = usableWidth;
+                  const maxHeight = billAreaHeight - 72 - 30; // Account for text and padding
+                  let width = maxWidth;
+                  let height = width / aspect;
+                  if (height > maxHeight) {
+                    height = maxHeight;
+                    width = height * aspect;
+                  } else {
+                    const scaleFactor = Math.min(maxHeight / height, 1.2);
+                    height *= scaleFactor;
+                    width = height * aspect;
+                    if (width > maxWidth) {
+                      width = maxWidth;
+                      height = width / aspect;
+                    }
+                  }
+                  const x = (canvas.width - width) / 2;
+                  const y = 72;
+                  ctx.drawImage(img, 0, 0, img.width, img.height, x, y, width, height);
+                  ctx.strokeStyle = 'black';
+                  ctx.lineWidth = 8;
+                  ctx.strokeRect(x, y, width, height);
+                  ctx.fillText(billNumber, x, y - 30);
+                  drawItems(canvas, ctx, billAreaHeight, maxItems);
+                };
+                img.onerror = () => {
+                  console.error('Failed to load resized bill image');
+                  alert('Failed to load bill image. Try another.');
+                  drawItems(canvas, ctx, billAreaHeight, maxItems);
+                };
+              }).catch(error => {
+                console.error('Bill image resize error:', error);
+                alert('Failed to process bill image. Try another.');
+                drawItems(canvas, ctx, billAreaHeight, maxItems);
+              });
+            } else {
+              drawItems(canvas, ctx, billAreaHeight, maxItems);
+            }
         };
 
-        // Draw items with bin-packing
+        // Draw items with improved bin-packing
         const drawItems = (canvas, ctx, billAreaHeight, maxItems) => {
           const items = photos.filter(p => p.category === 'Item');
           console.log('Drawing items:', items.length);
@@ -480,7 +484,7 @@
           const usableWidth = canvas.width - 40;
           const usableHeight = itemAreaHeight;
 
-          // Bin-packing algorithm
+          // Improved bin-packing algorithm
           const packItems = (items, maxWidth, maxHeight) => {
             const sortedItems = items
               .slice(0, maxItems)
@@ -488,29 +492,30 @@
                 const img = new Image();
                 img.src = item.croppedUrl || item.url;
                 return { item, index, width: img.width, height: img.height, aspect: img.width / img.height || 1 };
-              })
-              .sort((a, b) => (b.width * b.height) - (a.width * a.height));
+              });
 
             const positions = [];
-            const root = { x: 0, y: 0, width: maxWidth, height: maxHeight };
-            const nodes = [root];
+            const nodes = [{ x: 0, y: 0, width: maxWidth, height: maxHeight }];
+            const itemCount = sortedItems.length;
+            const minSize = 100; // Minimum width/height for viewability
+            const baseWidth = Math.sqrt((maxWidth * maxHeight * 0.9) / itemCount) * 0.8; // Estimate initial size
 
-            sortedItems.forEach(({ item, index, aspect }) => {
+            sortedItems.forEach(({ item, index, aspect }, idx) => {
               let bestNode = null;
               let bestWidth, bestHeight, bestX, bestY;
-              let minArea = Infinity;
+              let minScore = Infinity;
 
               nodes.forEach(node => {
-                let width = Math.min(maxWidth / 2, node.width);
+                let width = Math.max(minSize, Math.min(baseWidth, node.width));
                 let height = width / aspect;
                 if (height > node.height) {
-                  height = Math.min(maxHeight / 2, node.height);
+                  height = Math.max(minSize, Math.min(node.height, baseWidth / aspect));
                   width = height * aspect;
                 }
                 if (width <= node.width && height <= node.height) {
-                  const area = width * height;
-                  if (area < minArea) {
-                    minArea = area;
+                  const score = (node.width - width) + (node.height - height);
+                  if (score < minScore) {
+                    minScore = score;
                     bestNode = node;
                     bestWidth = width;
                     bestHeight = height;
@@ -521,15 +526,21 @@
               });
 
               if (bestNode) {
-                const scaleFactor = Math.min(bestNode.width / bestWidth, bestNode.height / bestHeight, 1.2);
+                // Scale up to fill space, up to 20% or node limits
+                const scaleFactor = Math.min(
+                  bestNode.width / bestWidth,
+                  bestNode.height / bestHeight,
+                  1.2,
+                  (maxWidth * maxHeight * 0.9 / itemCount) / (bestWidth * bestHeight)
+                );
                 bestWidth *= scaleFactor;
                 bestHeight *= scaleFactor;
                 positions.push({ index, x: bestX, y: bestY, width: bestWidth, height: bestHeight });
 
+                // Split node
                 const nodeIndex = nodes.indexOf(bestNode);
                 nodes.splice(nodeIndex, 1);
-
-                if (bestNode.width - bestWidth > 10) {
+                if (bestNode.width - bestWidth > minSize) {
                   nodes.push({
                     x: bestX + bestWidth + 10,
                     y: bestY,
@@ -537,7 +548,7 @@
                     height: bestHeight,
                   });
                 }
-                if (bestNode.height - bestHeight > 10) {
+                if (bestNode.height - bestHeight > minSize) {
                   nodes.push({
                     x: bestX,
                     y: bestY + bestHeight + 10,
@@ -548,29 +559,17 @@
               }
             });
 
-            // Fallback grid for unplaced items
-            if (positions.length < sortedItems.length) {
-              console.log('Using fallback grid for unplaced items');
-              const unplaced = sortedItems.filter((_, idx) => !positions.find(p => p.index === idx));
-              const cols = Math.ceil(Math.sqrt(unplaced.length));
-              const cellWidth = (maxWidth - (cols - 1) * 10) / cols;
-              const cellHeight = (maxHeight - (Math.ceil(unplaced.length / cols) - 1) * 10) / Math.ceil(unplaced.length / cols);
-
-              unplaced.forEach(({ index }, idx) => {
-                const row = Math.floor(idx / cols);
-                const col = idx % cols;
-                const width = cellWidth;
-                const height = cellWidth / (sortedItems[index].aspect || 1);
-                const scaledHeight = Math.min(height, cellHeight);
-                const scaledWidth = scaledHeight * (sortedItems[index].aspect || 1);
-                positions.push({
-                  index,
-                  x: col * (cellWidth + 10),
-                  y: row * (cellHeight + 10),
-                  width: scaledWidth,
-                  height: scaledHeight,
+            // Optimize layout by adjusting sizes
+            if (positions.length === sortedItems.length) {
+              const totalArea = positions.reduce((sum, p) => sum + p.width * p.height, 0);
+              const targetArea = maxWidth * maxHeight * 0.9;
+              if (totalArea < targetArea) {
+                const scale = Math.sqrt(targetArea / totalArea);
+                positions.forEach(pos => {
+                  pos.width = Math.min(pos.width * scale, maxWidth - pos.x);
+                  pos.height = Math.min(pos.height * scale, maxHeight - pos.y);
                 });
-              });
+              }
             }
 
             console.log('Packed positions:', positions);
@@ -604,7 +603,7 @@
                 ctx.strokeRect(x + 20, y + billAreaHeight + 8, width, height);
                 loaded++;
                 if (loaded === maxItems) {
-                  finalizeCollage();
+                    finalizeCollage();
                 }
               };
               img.onerror = () => {
@@ -612,7 +611,7 @@
                 alert('Failed to load item image ' + (index + 1) + '. Skipping.');
                 loaded++;
                 if (loaded === maxItems) {
-                  finalizeCollage();
+                    finalizeCollage();
                 }
               };
             }
