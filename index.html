@@ -68,7 +68,7 @@
               maxWidth: 3840,
               maxHeight: 3840,
             });
-            const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 1.00);
+            const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 1.0);
             onSave({ cropData, croppedUrl });
           }
         };
@@ -88,7 +88,7 @@
               <div className="flex-grow overflow-y-auto">
                 <img ref={cropperRef} src={image} alt="Crop" className="max-w-full max-h-[60vh] object-contain" />
                 <div className="mt-4">
-                  <label className="block mb-2">Zoom: {zoom.toFixed(1)}</label>
+                  <label className="block mb-2">Zoom: {zoom.toFixed(2)}</label>
                   <input
                     type="range"
                     min="0.1"
@@ -120,7 +120,7 @@
       }
 
       // Google Drive API Configuration
-      const CLIENT_ID = '684893590470-iqsa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
+      const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
       const API_KEY = 'AIzaSyBDCNxfd_hjhAVk0lFcgaoTvZrHbQOAhAY';
       const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
       const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -258,7 +258,7 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                   setPhotos(prevPhotos => [...prevPhotos, { url: reader.result, category, cropData: null, croppedUrl: null }]);
-                });
+                };
                 reader.onerror = () => {
                   console.error('Error reading item file');
                   alert('Error reading item photo.');
@@ -280,7 +280,7 @@
             const newPhotos = [...prevPhotos];
             newPhotos[cropModal] = { ...newPhotos[cropModal], cropData, croppedUrl };
             return newPhotos;
-          };
+          });
           setCropModal(null);
         };
 
@@ -405,7 +405,7 @@
 
           const bill = photos.find(p => p.category === 'Bill');
           const items = photos.filter(p => p.category === 'Item');
-          let maxItems = Math.min(items.length, 12);
+          const maxItems = Math.min(items.length, 12);
 
           let billAreaHeight;
           const totalArea = canvas.width * canvas.height;
@@ -417,7 +417,7 @@
             const img = new Image();
             img.src = item.croppedUrl || item.url;
             const aspect = img.width / img.height || 1;
-            const width = 300; // Base width for estimation
+            const width = 300;
             const height = width / aspect;
             totalItemArea += width * height;
           });
@@ -428,17 +428,17 @@
               Math.max(
                 475,
                 (minContentArea - totalItemArea) / usableWidth
-              );
+              )
+            );
           } else {
             billAreaHeight = 0;
           }
 
           if (bill) {
             const billImageUrl = bill.croppedUrl || bill.url;
-            resizeImage(billImageUrl, 3840, 1.00).then(resizedUrl => {
+            resizeImage(billImageUrl, 3840, 1.0).then(resizedUrl => {
               const img = new Image();
               img.src = resizedUrl;
-              img.crossOrigin = null;
               img.onload = () => {
                 console.log('Resized bill image loaded');
                 const aspect = img.width / img.height;
@@ -488,11 +488,11 @@
           console.log('Drawing items:', items.length);
           if (items.length === 0) {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 1.00);
+              const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
                 if (blob) setCollageBlob(blob);
-              }, 'image/jpeg', 1.00);
+              }, 'image/jpeg', 1.0);
             } catch (error) {
               console.error('Canvas tainted error:', error);
               alert('Failed to generate collage. Use images from the same device.');
@@ -594,11 +594,11 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 1.00);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 1.00);
+                    }, 'image/jpeg', 1.0);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage. Use images from the same device.');
@@ -611,11 +611,11 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 1.00);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 1.00);
+                    }, 'image/jpeg', 1.0);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage. Use images from the same device.');
