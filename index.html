@@ -48,7 +48,7 @@
         useEffect(() => {
           if (cropperRef.current) {
             const cropper = new Cropper(cropperRef.current, {
-              aspectRatio: NaN, // Free aspect ratio
+              aspectRatio: NaN,
               viewMode: 1,
               autoCropArea: 0.8,
               zoomable: true,
@@ -84,22 +84,24 @@
 
         return (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white p-4 rounded-lg max-w-lg w-full">
+            <div className="bg-white p-4 rounded-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
               <h2 className="text-lg font-semibold mb-2">Edit Image</h2>
-              <img ref={cropperRef} src={image} alt="Crop" className="max-w-full h-auto" />
-              <div className="mt-4">
-                <label className="block mb-2">Zoom: {zoom.toFixed(2)}</label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="3"
-                  step="0.1"
-                  value={zoom}
-                  onChange={handleZoom}
-                  className="w-full"
-                />
+              <div className="flex-grow overflow-y-auto">
+                <img ref={cropperRef} src={image} alt="Crop" className="max-w-full max-h-[60vh] object-contain" />
+                <div className="mt-4">
+                  <label className="block mb-2">Zoom: {zoom.toFixed(2)}</label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="3"
+                    step="0.1"
+                    value={zoom}
+                    onChange={handleZoom}
+                    className="w-full"
+                  />
+                </div>
               </div>
-              <div className="flex space-x-4 mt-4">
+              <div className="flex space-x-4 mt-4 sticky bottom-0 bg-white pt-2">
                 <button
                   onClick={handleSave}
                   className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
@@ -168,12 +170,13 @@
               canvas.width = width;
               canvas.height = height;
               const ctx = canvas.getContext('2d');
+              ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, width, height);
 
-              // Apply sharpening filter
+              // Apply enhanced sharpening filter
               const imageData = ctx.getImageData(0, 0, width, height);
               const data = imageData.data;
-              const kernel = [-1, -1, -1, -1, 9, -1, -1, -1, -1];
+              const kernel = [-2, -2, -2, -2, 12, -2, -2, -2, -2];
               const side = Math.round(Math.sqrt(kernel.length));
               const halfSide = Math.floor(side / 2);
               const tempData = data.slice();
@@ -226,10 +229,24 @@
               if (file) {
                 const reader = new FileReader();
                 reader.onload = () => {
-                  setPhotos(prevPhotos => {
-                    const withoutBill = prevPhotos.filter(p => p.category !== 'Bill');
-                    return [...withoutBill, { url: reader.result, category, cropData: null }];
-                  });
+                  const img = new Image();
+                  img.src = reader.result;
+                  img.onload = () => {
+                    // Check orientation for camera uploads
+                    const isCamera = e.target.getAttribute('capture') === 'environment';
+                    if (isCamera && img.width <= img.height) {
+                      alert('Please take the bill photo in landscape orientation.');
+                      return;
+                    }
+                    setPhotos(prevPhotos => {
+                      const withoutBill = prevPhotos.filter(p => p.category !== 'Bill');
+                      return [...withoutBill, { url: reader.result, category, cropData: null }];
+                    });
+                  };
+                  img.onerror = () => {
+                    console.error('Error loading bill image for orientation check');
+                    alert('Failed to validate bill photo. Please try another image.');
+                  };
                 };
                 reader.onerror = () => {
                   console.error('Error reading bill file');
@@ -303,7 +320,6 @@
                   },
                 });
                 setGapiReady(true);
-                // Trigger authentication immediately
                 tokenClientRef.current.requestAccessToken();
               }).catch(error => console.error('GAPI client init error:', error));
             });
@@ -382,6 +398,7 @@
           canvas.width = 500;
           canvas.height = 950;
           const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingQuality = 'high';
           ctx.fillStyle = '#fff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.font = 'bold 24px Arial';
@@ -389,37 +406,43 @@
 
           const bill = photos.find(p => p.category === 'Bill');
           const items = photos.filter(p => p.category === 'Item');
-          const itemCount = Math.min(items.length, 12); // Cap at 12 items
+          const itemCount = Math.min(items.length, 12);
 
           let billAreaHeight;
           if (itemCount === 1) {
-            billAreaHeight = 475; // 50%
+            billAreaHeight = 475;
           } else if (itemCount === 2) {
-            billAreaHeight = 380; // 40%
+            billAreaHeight = 380;
           } else if (itemCount === 3) {
-            billAreaHeight = 314; // 33%
+            billAreaHeight = 314;
           } else {
-            billAreaHeight = 237.5; // 25% for 4+
+            billAreaHeight = 237.5;
           }
 
           if (bill) {
-            resizeImage(bill.url, 1920, 0.98).then(resizedUrl => {
+            resizeImage(bill.url, 2560, 1.0).then(resizedUrl => {
               const img = new Image();
               img.src = resizedUrl;
               img.crossOrigin = 'Anonymous';
               img.onload = () => {
                 console.log('Resized bill image loaded');
                 const aspect = img.width / img.height;
-                const maxWidth = 460; // 500 - 20px left - 20px right
-                const maxHeight = billAreaHeight - 36 - 15; // Area minus top padding and caption space
+                const maxWidth = 460;
+                const maxHeight = billAreaHeight - 36 - 15;
                 let width = maxWidth;
                 let height = width / aspect;
-                if (height > maxHeight) {
-                  height = maxHeight;
+                // Allow slight upscale to minimize empty space
+                const upscaleFactor = Math.min(1.5, maxHeight / height);
+                if (height * upscaleFactor <= maxHeight) {
+                  height *= upscaleFactor;
                   width = height * aspect;
                 }
-                const x = (canvas.width - width) / 2; // Center horizontally
-                const y = 36; // Top padding
+                if (width > maxWidth) {
+                  width = maxWidth;
+                  height = width / aspect;
+                }
+                const x = (canvas.width - width) / 2;
+                const y = 36;
                 if (bill.cropData) {
                   const { x: sx, y: sy, width: sWidth, height: sHeight } = bill.cropData;
                   ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, width, height);
@@ -429,7 +452,7 @@
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(x, y, width, height);
-                ctx.fillText(billNumber, x, y - 15); // Caption at y=21
+                ctx.fillText(billNumber, x, y - 15);
                 drawItems(canvas, ctx, billAreaHeight, itemCount);
               };
               img.onerror = () => {
@@ -465,34 +488,44 @@
             return;
           }
           let loaded = 0;
-          const maxItems = Math.min(itemCount, 12); // Cap at 12 items
-          let itemAreaHeight = 950 - billAreaHeight - 20; // Remaining height minus bottom padding
+          const maxItems = Math.min(itemCount, 12);
+          let itemAreaHeight = 950 - billAreaHeight - 20;
           let itemWidth, itemHeight, positions;
 
-          // Define optimal layouts: [cols, rows]
+          // Optimized layouts to minimize empty space
           const layouts = {
-            1: [1, 1], // 1x1
-            2: [2, 1], // 2x1
-            3: [3, 1], // 3x1
-            4: [2, 2], // 2x2
-            5: [3, 2], // 3x2
-            6: [3, 2], // 3x2
-            7: [3, 3], // 3x3
-            8: [3, 3], // 3x3
-            9: [3, 3], // 3x3
-            10: [3, 4], // 3x4
-            11: [3, 4], // 3x4
-            12: [3, 4], // 3x4
+            1: [1, 1],
+            2: [2, 1],
+            3: [3, 1],
+            4: [2, 2],
+            5: [2, 3],
+            6: [3, 2],
+            7: [3, 3],
+            8: [3, 3],
+            9: [3, 3],
+            10: [3, 4],
+            11: [3, 4],
+            12: [3, 4],
           };
 
           const [cols, rows] = layouts[maxItems];
-          itemWidth = (460 - (cols - 1) * 10) / cols; // Usable width minus gaps
-          itemHeight = (itemAreaHeight - (rows - 1) * 10) / rows; // Usable height minus gaps
+          const filledCells = Math.min(maxItems, cols * rows);
+          const usableWidth = 460;
+          const usableHeight = itemAreaHeight;
+          itemWidth = (usableWidth - (cols - 1) * 10) / cols;
+          itemHeight = (usableHeight - (rows - 1) * 10) / rows;
+
+          // Adjust for partial rows
+          if ([5, 7, 8, 10, 11].includes(maxItems)) {
+            const actualRows = Math.ceil(maxItems / cols);
+            itemHeight = (usableHeight - (actualRows - 1) * 10) / actualRows;
+          }
+
           positions = [];
           for (let row = 0; row < rows; row++) {
             for (let col = 0; col < cols && (row * cols + col) < maxItems; col++) {
-              const x = 20 + col * (itemWidth + 10); // Left padding + column offset
-              const y = billAreaHeight + row * (itemHeight + 10); // Bill bottom + row offset
+              const x = 20 + col * (itemWidth + 10);
+              const y = billAreaHeight + row * (itemHeight + 10);
               positions.push([x, y]);
             }
           }
@@ -508,11 +541,16 @@
                 const aspect = img.width / img.height;
                 let width = itemWidth;
                 let height = width / aspect;
-                if (height > itemHeight) {
-                  height = itemHeight;
+                const upscaleFactor = Math.min(1.5, itemHeight / height);
+                if (height * upscaleFactor <= itemHeight) {
+                  height *= upscaleFactor;
                   width = height * aspect;
                 }
-                const drawX = x + (itemWidth - width) / 2; // Center within area
+                if (width > itemWidth) {
+                  width = itemWidth;
+                  height = width / aspect;
+                }
+                const drawX = x + (itemWidth - width) / 2;
                 const drawY = y + (itemHeight - height) / 2;
                 if (item.cropData) {
                   const { x: sx, y: sy, width: sWidth, height: sHeight } = item.cropData;
@@ -637,7 +675,7 @@
                   if (error.name !== 'AbortError') {
                     reject(new Error(`Failed to share: ${error.message || 'Unknown share error'}`));
                   } else {
-                    resolve(false); // User canceled share
+                    resolve(false);
                   }
                 });
               } else {
@@ -663,7 +701,6 @@
           }
           setIsSavingAndSharing(true);
           try {
-            // Step 1: Share to WhatsApp
             try {
               const shared = await shareToBrowser();
               if (!shared) {
@@ -673,13 +710,12 @@
               console.error('Share error:', shareError);
               alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Proceeding to upload to Drive.`);
             }
-            // Step 2: Upload to Google Drive in background
             try {
               const fileId = await uploadToDrive();
               alert(`Uploaded to Google Drive! File ID: ${fileId}`);
             } catch (driveError) {
               console.error('Drive upload error:', driveError);
-              alert('Failed to upload to Google Drive: ' + (driveError.message || 'Unknown error') + '.');
+              alert(`Failed to upload to Google Drive: ${driveError.message || 'Unknown error'}.`);
             }
           } finally {
             setIsSavingAndSharing(false);
