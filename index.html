@@ -409,37 +409,45 @@
           const itemCount = Math.min(items.length, 12);
 
           let billAreaHeight;
-          if (itemCount === 1) {
-            billAreaHeight = 475;
-          } else if (itemCount === 2) {
-            billAreaHeight = 380;
-          } else if (itemCount === 3) {
-            billAreaHeight = 314;
+          // Adjust bill area height to ensure empty space <= 10%
+          const totalArea = canvas.width * canvas.height;
+          const maxEmptyArea = totalArea * 0.1;
+          const minContentArea = totalArea - maxEmptyArea;
+          // Estimate item area needed (assume square images for simplicity)
+          const itemAreaPerImage = (canvas.width - 40) / 3 * (canvas.width - 40) / 3; // Approx per item
+          const totalItemArea = itemCount * itemAreaPerImage;
+          const billAreaEstimate = (canvas.width - 40) * (canvas.width - 40) * 0.6; // Approx bill area
+          const contentAreaEstimate = bill ? (billAreaEstimate + totalItemArea) : totalItemArea;
+          // Calculate required bill height to meet content area needs
+          if (bill) {
+            billAreaHeight = Math.min(
+              475, // Max bill height
+              Math.max(
+                237.5, // Min bill height
+                (minContentArea - totalItemArea) / (canvas.width - 40) // Height to satisfy min content area
+              )
+            );
           } else {
-            billAreaHeight = 237.5;
+            billAreaHeight = 0; // No bill, items take all space
           }
 
           if (bill) {
-            resizeImage(bill.url, 2560, 1.0).then(resizedUrl => {
+            // Increase maxDimension and quality for clearer bill image
+            resizeImage(bill.url, 3840, 0.95).then(resizedUrl => {
               const img = new Image();
               img.src = resizedUrl;
               img.crossOrigin = 'Anonymous';
               img.onload = () => {
                 console.log('Resized bill image loaded');
                 const aspect = img.width / img.height;
-                const maxWidth = 460;
-                const maxHeight = billAreaHeight - 36 - 15;
+                const maxWidth = canvas.width - 40; // 20px padding each side
+                const maxHeight = billAreaHeight - 36 - 15; // Account for text and padding
                 let width = maxWidth;
                 let height = width / aspect;
-                // Allow slight upscale to minimize empty space
-                const upscaleFactor = Math.min(1.5, maxHeight / height);
-                if (height * upscaleFactor <= maxHeight) {
-                  height *= upscaleFactor;
+                // Maximize bill image size within bounds
+                if (height > maxHeight) {
+                  height = maxHeight;
                   width = height * aspect;
-                }
-                if (width > maxWidth) {
-                  width = maxWidth;
-                  height = width / aspect;
                 }
                 const x = (canvas.width - width) / 2;
                 const y = 36;
@@ -476,11 +484,11 @@
           console.log('Drawing items:', items.length);
           if (items.length === 0) {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.95); // Increase quality
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
                 if (blob) setCollageBlob(blob);
-              }, 'image/jpeg', 0.75);
+              }, 'image/jpeg', 0.95);
             } catch (error) {
               console.error('Canvas tainted error:', error);
               alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
@@ -490,7 +498,6 @@
           let loaded = 0;
           const maxItems = Math.min(itemCount, 12);
           let itemAreaHeight = 950 - billAreaHeight - 20;
-          let itemWidth, itemHeight, positions;
 
           // Optimized layouts to minimize empty space
           const layouts = {
@@ -498,34 +505,51 @@
             2: [2, 1],
             3: [3, 1],
             4: [2, 2],
-            5: [2, 3],
+            5: [3, 2],
             6: [3, 2],
             7: [3, 3],
             8: [3, 3],
             9: [3, 3],
-            10: [3, 4],
-            11: [3, 4],
-            12: [3, 4],
+            10: [4, 3],
+            11: [4, 3],
+            12: [4, 3],
           };
 
-          const [cols, rows] = layouts[maxItems];
-          const filledCells = Math.min(maxItems, cols * rows);
-          const usableWidth = 460;
-          const usableHeight = itemAreaHeight;
-          itemWidth = (usableWidth - (cols - 1) * 10) / cols;
-          itemHeight = (usableHeight - (rows - 1) * 10) / rows;
-
-          // Adjust for partial rows
-          if ([5, 7, 8, 10, 11].includes(maxItems)) {
-            const actualRows = Math.ceil(maxItems / cols);
-            itemHeight = (usableHeight - (actualRows - 1) * 10) / actualRows;
+          const [cols, rows] = layouts[maxItems] || [4, 3]; // Default to 4x3 for safety
+          const totalArea = canvas.width * canvas.height;
+          const maxEmptyArea = totalArea * 0.1;
+          const minContentArea = totalArea - maxEmptyArea;
+          const usableWidth = canvas.width - 40; // 20px padding each side
+          let usableHeight = itemAreaHeight;
+          // Adjust rows/cols if needed to meet empty space constraint
+          let actualRows = rows;
+          if (maxItems < cols * rows) {
+            actualRows = Math.ceil(maxItems / cols);
+          }
+          // Calculate item dimensions to maximize content area
+          let itemWidth = (usableWidth - (cols - 1) * 10) / cols;
+          let itemHeight = (usableHeight - (actualRows - 1) * 10) / actualRows;
+          // Adjust dimensions to ensure content area is at least 90%
+          const imageArea = itemWidth * itemHeight * maxItems;
+          const billArea = billAreaHeight * usableWidth;
+          let currentContentArea = billArea + imageArea;
+          if (currentContentArea < minContentArea) {
+            // Scale up item dimensions
+            const scaleFactor = Math.sqrt(minContentArea / currentContentArea);
+            itemWidth *= scaleFactor;
+            itemHeight *= scaleFactor;
+            usableHeight = itemHeight * actualRows + (actualRows - 1) * 10;
+            // Recalculate billAreaHeight if needed
+            if (billAreaHeight > 0) {
+              billAreaHeight = 950 - usableHeight - 20;
+            }
           }
 
-          positions = [];
-          for (let row = 0; row < rows; row++) {
+          const positions = [];
+          for (let row = 0; row < actualRows; row++) {
             for (let col = 0; col < cols && (row * cols + col) < maxItems; col++) {
               const x = 20 + col * (itemWidth + 10);
-              const y = billAreaHeight + row * (itemHeight + 10);
+              const y = billAreaHeight + 20 + row * (itemHeight + 10);
               positions.push([x, y]);
             }
           }
@@ -541,14 +565,9 @@
                 const aspect = img.width / img.height;
                 let width = itemWidth;
                 let height = width / aspect;
-                const upscaleFactor = Math.min(1.5, itemHeight / height);
-                if (height * upscaleFactor <= itemHeight) {
-                  height *= upscaleFactor;
+                if (height > itemHeight) {
+                  height = itemHeight;
                   width = height * aspect;
-                }
-                if (width > itemWidth) {
-                  width = itemWidth;
-                  height = width / aspect;
                 }
                 const drawX = x + (itemWidth - width) / 2;
                 const drawY = y + (itemHeight - height) / 2;
@@ -564,11 +583,11 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95); // Increase quality
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 0.75);
+                    }, 'image/jpeg', 0.95);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
@@ -581,11 +600,11 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95); // Increase quality
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 0.75);
+                    }, 'image/jpeg', 0.95);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
