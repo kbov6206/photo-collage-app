@@ -206,7 +206,7 @@
 
           const bill = photos.find(p => p.category === 'Bill');
           const items = photos.filter(p => p.category === 'Item');
-          const itemCount = Math.min(items.length, 4);
+          const itemCount = Math.min(items.length, 12); // Cap at 12 items
 
           let billAreaHeight;
           if (itemCount === 1) {
@@ -241,22 +241,22 @@
               ctx.lineWidth = 4;
               ctx.strokeRect(x, y, width, height);
               ctx.fillText(billNumber, x, y - 15); // Caption at y=21
-              drawItems(canvas, ctx, billAreaHeight);
+              drawItems(canvas, ctx, billAreaHeight, itemCount);
             };
             img.onerror = () => {
               console.error('Failed to load bill image');
               alert('Failed to load bill image. Please try another image.');
-              drawItems(canvas, ctx, billAreaHeight);
+              drawItems(canvas, ctx, billAreaHeight, itemCount);
             };
           } else {
-            drawItems(canvas, ctx, billAreaHeight);
+            drawItems(canvas, ctx, billAreaHeight, itemCount);
           }
         };
 
         // Draw items
-        const drawItems = (canvas, ctx, billAreaHeight) => {
+        const drawItems = (canvas, ctx, billAreaHeight, itemCount) => {
           const items = photos.filter(p => p.category === 'Item');
-          console.log('Items:', items.length);
+          console.log('Drawing items:', items.length);
           if (items.length === 0) {
             try {
               const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -266,35 +266,42 @@
               }, 'image/jpeg', 0.9);
             } catch (error) {
               console.error('Canvas tainted error:', error);
-              alert('Failed to generate collage due to image access restrictions.');
+              alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
             }
             return;
           }
           let loaded = 0;
-          const maxItems = Math.min(items.length, 4);
+          const maxItems = Math.min(itemCount, 12); // Cap at 12 items
           let itemAreaHeight, itemWidth, itemHeight, positions;
 
           if (maxItems === 1) {
+            itemAreaHeight = 950 - billAreaHeight - 20; // 475px
             itemWidth = 460; // Full width
-            itemHeight = itemAreaHeight; // 475px
+            itemHeight = itemAreaHeight;
             positions = [[20, billAreaHeight]]; // Start at bill bottom
           } else if (maxItems === 2) {
+            itemAreaHeight = 950 - billAreaHeight - 20; // 570px
             itemWidth = 225; // (460 - 10px gap) / 2
-            itemHeight = 570; // 570px
+            itemHeight = itemAreaHeight;
             positions = [[20, billAreaHeight], [255, billAreaHeight]]; // Side by side
           } else if (maxItems === 3) {
+            itemAreaHeight = 950 - billAreaHeight - 20; // ~636px
             itemWidth = 146.67; // (460 - 2*10px gaps) / 3
-            itemHeight = itemAreaHeight; // ~636px
+            itemHeight = itemAreaHeight;
             positions = [[20, billAreaHeight], [176.67, billAreaHeight], [333.34, billAreaHeight]]; // Side by side
           } else {
-            itemWidth = 225; // (460 - 10px gap) / 2
-            itemHeight = (itemAreaHeight - 10) / 2; // (400 - 10px gap) / 2 = 351.25px
-            positions = [
-              [20, billAreaHeight],
-              [255, billAreaHeight],
-              [20, billAreaHeight + 351.25 + 10],
-              [255, billAreaHeight + 351.25 + 10]
-            ]; // 2x2 grid
+            itemAreaHeight = 712.5; // Fixed at 75% (950 - 237.5 - 20)
+            const rows = Math.ceil(maxItems / 3); // Rows needed
+            itemWidth = 146.67; // (460 - 2*10px gaps) / 3
+            itemHeight = (itemAreaHeight - (rows - 1) * 10) / rows; // Height per row
+            positions = [];
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < 3 && (row * 3 + col) < maxItems; col++) {
+                const x = 20 + col * (itemWidth + 10);
+                const y = billAreaHeight + row * (itemHeight + 10);
+                positions.push([x, y]);
+              }
+            }
           }
 
           items.forEach((item, index) => {
@@ -312,7 +319,7 @@
                   height = itemHeight;
                   width = height * aspect;
                 }
-                const drawX = x + (itemWidth - width) / 2; // Center within item
+                const drawX = x + (itemWidth - width) / 2; // Center within area
                 const drawY = y + (itemHeight - height) / 2;
                 ctx.drawImage(img, drawX, drawY, width, height);
                 ctx.strokeStyle = '#000';
@@ -328,7 +335,7 @@
                     }, 'image/jpeg', 0.9);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions.');
+                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
                   }
                 }
               };
@@ -345,7 +352,7 @@
                     }, 'image/jpeg', 0.9);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions.');
+                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
                   }
                 }
               };
@@ -359,7 +366,7 @@
             throw new Error('Please create a collage first.');
           }
           if (!billNumber.trim()) {
-            throw new Error('Please enter a bill number.');
+            throw new Error('Please enter a Bill Number.');
           }
           try {
             const accessToken = await getAccessToken();
@@ -369,7 +376,7 @@
               mimeType: 'image/jpeg',
               parents: [FOLDER_ID],
             };
-            const boundary = '-------3141592653587';
+            const boundary = '-------314159265358979323846';
             const delimiter = `\r\n--${boundary}\r\n`;
             const closeDelimiter = `\r\n--${boundary}--`;
             const multipartRequestBody =
@@ -410,13 +417,13 @@
             throw new Error('Please create a collage first.');
           }
           if (!billNumber.trim()) {
-            throw new Error('Please enter a bill number.');
+            throw new Error('Please enter a Bill Number.');
           }
           console.log('Preparing to share with Bill Number:', billNumber);
           return new Promise((resolve, reject) => {
             try {
               const file = new File([collageBlob], `${sanitizeFilename(billNumber)}.jpg`, { type: 'image/jpeg' });
-              console.log('File created for sharing:', file.type, 'size:', file.size);
+              console.log('File created for sharing, size:', file.size, 'type:', file.type);
               const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
               if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                 console.log('Initiating navigator.share with share data:', { files: [file], text: billNumber, title: billNumber });
@@ -425,18 +432,18 @@
                   text: billNumber,
                   title: billNumber,
                 }).then(() => {
-                  console.log('Sharing successful');
+                  console.log('Browser share successful');
                   resolve(true);
-                } catch (error => {
-                  console.error('Sharing error:', error.message);
+                }).catch(error => {
+                  console.error('Navigator share error:', error, 'Message:', error.message);
                   if (error.name !== 'AbortError') {
-                    reject(new Error(`Failed to share: ${error.message || 'Unknown error'}`));
+                    reject(new Error(`Failed to share: ${error.message || 'Unknown share error'}`));
                   } else {
-                    resolve(false); // User canceled
+                    resolve(false); // User canceled share
                   }
                 });
               } else {
-                console.log('Browser sharing not supported, downloading');
+                console.log('Browser sharing not supported or cannot share file, downloading');
                 const link = document.createElement('a');
                 link.href = collageUrl;
                 link.download = `${sanitizeFilename(billNumber)}.jpg`;
@@ -445,12 +452,12 @@
               }
             } catch (error) {
               console.error('Share processing error:', error);
-              reject(new Error(`Share error: ${error.message || ''}`));
+              reject(new Error(`Share processing error: ${error.message || 'Unknown error'}`));
             }
           });
         };
 
-        // Save and Share
+        // Save and Share (WhatsApp then Drive)
         const saveAndShare = async () => {
           if (isSavingAndSharing) {
             alert('Please wait for the previous operation to complete.');
@@ -458,21 +465,23 @@
           }
           setIsSavingAndSharing(true);
           try {
+            // Step 1: Share to WhatsApp
             try {
               const shared = await shareToBrowser();
               if (!shared) {
-                console.log('Sharing not completed or not supported');
+                console.log('WhatsApp sharing not supported or canceled');
               }
             } catch (shareError) {
               console.error('Share error:', shareError);
-              alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Continuing with upload.`);
+              alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Proceeding to upload to Drive.`);
             }
+            // Step 2: Upload to Google Drive in background
             try {
               const fileId = await uploadToDrive();
-              alert(`Successfully uploaded to Google Drive! File ID: ${fileId}`);
+              alert(`Uploaded to Google Drive! File ID: ${fileId}`);
             } catch (driveError) {
               console.error('Drive upload error:', driveError);
-              alert(`Failed to upload to Drive: ${driveError.message || 'Unknown error'}.`);
+              alert('Failed to upload to Google Drive: ' + (driveError.message || 'Unknown error') + '.');
             }
           } finally {
             setIsSavingAndSharing(false);
@@ -481,7 +490,7 @@
 
         return (
           <div className="p-4 max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6">Photo Collage Application</h1>
+            <h1 className="text-2xl font-bold mb-6">Photo Collage App</h1>
             <div className="mb-6">
               <label className="block mb-2 font-medium">Bill Number:</label>
               <input
@@ -513,7 +522,7 @@
                   />
                 </label>
               </div>
-              <label className="block mb-2 font-medium">Item Photos (multiple allowed for Gallery):</label>
+              <label className="block mb-2 font-medium">Item Photos (Multiple Allowed for Gallery):</label>
               <div className="flex space-x-4 mb-4">
                 <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
                   Camera
