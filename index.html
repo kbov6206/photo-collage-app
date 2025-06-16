@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://apis.google.com data:; frame-src https://content.googleapis.com https://accounts.google.com;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com https://accounts.google.com https://apis.google.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; img-src * data:; connect-src * https://www.googleapis.com https://accounts.google.com https://apis.google.com data:; frame-src https://content.googleapis.com https://accounts.google.com;">
   <title>Photo Collage App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -63,13 +63,12 @@
           if (cropperRef.current) {
             const cropper = cropperRef.current.cropper;
             const cropData = cropper.getData();
-            // Generate cropped image as data URL to avoid canvas tainting
             const croppedCanvas = cropper.getCroppedCanvas({
               imageSmoothingQuality: 'high',
               maxWidth: 3840,
               maxHeight: 3840,
             });
-            const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 0.95);
+            const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 1.00);
             onSave({ cropData, croppedUrl });
           }
         };
@@ -89,7 +88,7 @@
               <div className="flex-grow overflow-y-auto">
                 <img ref={cropperRef} src={image} alt="Crop" className="max-w-full max-h-[60vh] object-contain" />
                 <div className="mt-4">
-                  <label className="block mb-2">Zoom: {zoom.toFixed(2)}</label>
+                  <label className="block mb-2">Zoom: {zoom.toFixed(1)}</label>
                   <input
                     type="range"
                     min="0.1"
@@ -121,7 +120,7 @@
       }
 
       // Google Drive API Configuration
-      const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
+      const CLIENT_ID = '684893590470-iqsa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
       const API_KEY = 'AIzaSyBDCNxfd_hjhAVk0lFcgaoTvZrHbQOAhAY';
       const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
       const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -150,7 +149,7 @@
           return new Promise((resolve, reject) => {
             const img = new Image();
             img.src = src;
-            img.crossOrigin = 'Anonymous';
+            img.crossOrigin = 'anonymous';
             img.onload = () => {
               let width = img.width;
               let height = img.height;
@@ -173,16 +172,16 @@
               ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, width, height);
 
-              // Apply enhanced sharpening filter
+              // Apply sharpening filter
               const imageData = ctx.getImageData(0, 0, width, height);
               const data = imageData.data;
-              const kernel = [-2, -2, -2, -2, 12, -2, -2, -2, -2];
+              const kernel = [-1, -1, -1, -1, 9, -1, -1, -1, -1];
               const side = Math.round(Math.sqrt(kernel.length));
               const halfSide = Math.floor(side / 2);
               const tempData = data.slice();
 
-              for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
+              for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
                   const dstOff = (y * width + x) * 4;
                   let r = 0, g = 0, b = 0;
                   for (let cy = 0; cy < side; cy++) {
@@ -245,12 +244,12 @@
                   };
                   img.onerror = () => {
                     console.error('Error loading bill image for orientation check');
-                    alert('Failed to validate bill photo. Please try another image.');
+                    alert('Failed to validate bill photo.');
                   };
                 };
                 reader.onerror = () => {
                   console.error('Error reading bill file');
-                  alert('Failed to read bill photo. Please try another image.');
+                  alert('Error reading bill photo.');
                 };
                 reader.readAsDataURL(file);
               }
@@ -259,10 +258,10 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                   setPhotos(prevPhotos => [...prevPhotos, { url: reader.result, category, cropData: null, croppedUrl: null }]);
-                };
+                });
                 reader.onerror = () => {
                   console.error('Error reading item file');
-                  alert('Failed to read item photo. Please try another image.');
+                  alert('Error reading item photo.');
                 };
                 reader.readAsDataURL(file);
               });
@@ -281,7 +280,7 @@
             const newPhotos = [...prevPhotos];
             newPhotos[cropModal] = { ...newPhotos[cropModal], cropData, croppedUrl };
             return newPhotos;
-          });
+          };
           setCropModal(null);
         };
 
@@ -358,7 +357,7 @@
                 resolve(existingToken.access_token);
                 return;
               } else {
-                console.log('Token expired or invalid, requesting new token');
+                console.log('Token expired or invalidating');
                 window.gapi.client.setToken(null);
               }
             }
@@ -380,7 +379,7 @@
 
         // Sanitize filename
         const sanitizeFilename = (name) => {
-          return name.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 100) || 'collage';
+          return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100) || 'collage';
         };
 
         // Create collage
@@ -395,67 +394,63 @@
             return;
           }
           const canvas = document.createElement('canvas');
-          canvas.width = 500;
-          canvas.height = 950;
+          canvas.width = 1000;
+          canvas.height = 1900;
           const ctx = canvas.getContext('2d');
           ctx.imageSmoothingQuality = 'high';
-          ctx.fillStyle = '#fff';
+          ctx.fillStyle = 'white';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.font = 'bold 24px Arial';
-          ctx.fillStyle = '#000';
+          ctx.font = 'bold 48px Arial';
+          ctx.fillStyle = 'black';
 
           const bill = photos.find(p => p.category === 'Bill');
           const items = photos.filter(p => p.category === 'Item');
-          const itemCount = Math.min(items.length, 12);
+          let maxItems = Math.min(items.length, 12);
 
           let billAreaHeight;
           const totalArea = canvas.width * canvas.height;
           const maxEmptyArea = totalArea * 0.1;
           const minContentArea = totalArea - maxEmptyArea;
-          const usableWidth = canvas.width - 40; // 20px padding each side
-          // Estimate item area needed
+          const usableWidth = canvas.width - 40;
           let totalItemArea = 0;
-          items.slice(0, itemCount).forEach(item => {
+          items.slice(0, maxItems).forEach(item => {
             const img = new Image();
             img.src = item.croppedUrl || item.url;
             const aspect = img.width / img.height || 1;
-            const width = 150; // Base width for estimation
+            const width = 300; // Base width for estimation
             const height = width / aspect;
             totalItemArea += width * height;
           });
-          const billAreaEstimate = bill ? (usableWidth * (usableWidth * 0.6)) : 0; // Approx bill area
+          const billAreaEstimate = bill ? (usableWidth * (usableWidth * 0.6)) : 0;
           if (bill) {
             billAreaHeight = Math.min(
-              475, // Max bill height
+              950,
               Math.max(
-                237.5, // Min bill height
-                (minContentArea - totalItemArea) / usableWidth // Height to satisfy min content area
-              )
-            );
+                475,
+                (minContentArea - totalItemArea) / usableWidth
+              );
           } else {
-            billAreaHeight = 0; // No bill, items take all space
+            billAreaHeight = 0;
           }
 
           if (bill) {
             const billImageUrl = bill.croppedUrl || bill.url;
-            resizeImage(billImageUrl, 3840, 0.95).then(resizedUrl => {
+            resizeImage(billImageUrl, 3840, 1.00).then(resizedUrl => {
               const img = new Image();
               img.src = resizedUrl;
-              img.crossOrigin = 'Anonymous';
+              img.crossOrigin = null;
               img.onload = () => {
                 console.log('Resized bill image loaded');
                 const aspect = img.width / img.height;
                 const maxWidth = usableWidth;
-                const maxHeight = billAreaHeight - 36 - 15; // Account for text and padding
+                const maxHeight = billAreaHeight - 72 - 30;
                 let width = maxWidth;
                 let height = width / aspect;
-                // Maximize bill image size
                 if (height > maxHeight) {
                   height = maxHeight;
                   width = height * aspect;
                 } else {
-                  // Scale up to fill more space
-                  const scaleFactor = Math.min(maxHeight / height, 1.2); // Limit upscale to 20%
+                  const scaleFactor = Math.min(maxHeight / height, 1.2);
                   height *= scaleFactor;
                   width = height * aspect;
                   if (width > maxWidth) {
@@ -464,55 +459,53 @@
                   }
                 }
                 const x = (canvas.width - width) / 2;
-                const y = 36;
+                const y = 72;
                 ctx.drawImage(img, 0, 0, img.width, img.height, x, y, width, height);
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 4;
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 8;
                 ctx.strokeRect(x, y, width, height);
-                ctx.fillText(billNumber, x, y - 15);
-                drawItems(canvas, ctx, billAreaHeight, itemCount);
+                ctx.fillText(billNumber, x, y - 30);
+                drawItems(canvas, ctx, billAreaHeight, maxItems);
               };
               img.onerror = () => {
                 console.error('Failed to load resized bill image');
-                alert('Failed to load bill image. Please try another image.');
-                drawItems(canvas, ctx, billAreaHeight, itemCount);
+                alert('Failed to load bill image. Try another.');
+                drawItems(canvas, ctx, billAreaHeight, maxItems);
               };
             }).catch(error => {
               console.error('Bill image resize error:', error);
-              alert('Failed to process bill image. Please try another image.');
-              drawItems(canvas, ctx, billAreaHeight, itemCount);
+              alert('Failed to process bill image. Try another.');
+              drawItems(canvas, ctx, billAreaHeight, maxItems);
             });
           } else {
-            drawItems(canvas, ctx, billAreaHeight, itemCount);
+            drawItems(canvas, ctx, billAreaHeight, maxItems);
           }
         };
 
         // Draw items with bin-packing
-        const drawItems = (canvas, ctx, billAreaHeight, itemCount) => {
+        const drawItems = (canvas, ctx, billAreaHeight, maxItems) => {
           const items = photos.filter(p => p.category === 'Item');
           console.log('Drawing items:', items.length);
           if (items.length === 0) {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+              const dataUrl = canvas.toDataURL('image/jpeg', 1.00);
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
                 if (blob) setCollageBlob(blob);
-              }, 'image/jpeg', 0.95);
+              }, 'image/jpeg', 1.00);
             } catch (error) {
               console.error('Canvas tainted error:', error);
-              alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+              alert('Failed to generate collage. Use images from the same device.');
             }
             return;
           }
           let loaded = 0;
-          const maxItems = Math.min(itemCount, 12);
-          const itemAreaHeight = 950 - billAreaHeight - 4; // 4px padding
-          const usableWidth = canvas.width - 40; // 20px padding each side
+          const itemAreaHeight = 1900 - billAreaHeight - 8;
+          const usableWidth = canvas.width - 40;
           const usableHeight = itemAreaHeight;
 
-          // Bin-packing algorithm (first-fit decreasing)
+          // Bin-packing algorithm
           const packItems = (items, maxWidth, maxHeight) => {
-            // Sort items by height (descending) for better packing
             const sortedItems = items
               .slice(0, maxItems)
               .map((item, index) => {
@@ -530,12 +523,10 @@
               let bestFit = Infinity;
               let bestWidth, bestHeight, bestX, bestY;
 
-              // Find best bin to place the item
               for (const bin of bins) {
-                let width = maxWidth / 2; // Base width for scaling
+                let width = maxWidth / 2;
                 let height = width / aspect;
                 if (height > bin.height || width > bin.width) {
-                  // Try flipping orientation
                   height = maxHeight / 2;
                   width = height * aspect;
                   if (height > bin.height || width > bin.width) continue;
@@ -552,15 +543,12 @@
               }
 
               if (bestBin) {
-                // Maximize image size within bin
-                const scaleFactor = Math.min(bestBin.width / bestWidth, bestBin.height / bestHeight, 1.2); // Limit upscale
+                const scaleFactor = Math.min(bestBin.width / bestWidth, bestBin.height / bestHeight, 1.2);
                 bestWidth *= scaleFactor;
                 bestHeight *= scaleFactor;
-                // Place item in the best bin
                 positions.push({ index, x: bestX, y: bestY, width: bestWidth, height: bestHeight });
                 bestBin.items.push({ index, width: bestWidth, height: bestHeight });
 
-                // Split the bin into two new bins (horizontal and vertical splits)
                 const newBins = [];
                 if (bestBin.width - bestWidth > 0) {
                   newBins.push({
@@ -580,7 +568,6 @@
                     items: [],
                   });
                 }
-                // Remove the used bin and add new bins
                 bins.splice(bins.indexOf(bestBin), 1, ...newBins);
               }
             });
@@ -594,27 +581,27 @@
             if (index < maxItems) {
               const img = new Image();
               img.src = item.croppedUrl || item.url;
-              img.crossOrigin = 'Anonymous';
+              img.crossOrigin = 'anonymous';
               img.onload = () => {
                 console.log('Item image loaded', index);
                 const pos = positions.find(p => p.index === index);
-                if (!pos) return; // Skip if no position found
+                if (!pos) return;
                 const { x, y, width, height } = pos;
-                ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 4, width, height);
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 4;
-                ctx.strokeRect(x + 20, y + billAreaHeight + 4, width, height);
+                ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 8, width, height);
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 8;
+                ctx.strokeRect(x + 20, y + billAreaHeight + 8, width, height);
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 1.00);
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 0.95);
+                    }, 'image/jpeg', 1.00);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                    alert('Failed to generate collage. Use images from the same device.');
                   }
                 }
               };
@@ -624,14 +611,14 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 1.00);
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 0.95);
+                    }, 'image/jpeg', 1.00);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                    alert('Failed to generate collage. Use images from the same device.');
                   }
                 }
               };
