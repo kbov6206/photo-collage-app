@@ -83,7 +83,7 @@
         };
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg történőblack bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-4 rounded-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
               <h2 className="text-lg font-semibold mb-2">Edit Image</h2>
               <div className="flex-grow overflow-y-auto">
@@ -409,22 +409,27 @@
           const itemCount = Math.min(items.length, 12);
 
           let billAreaHeight;
-          // Adjust bill area height to ensure empty space <= 10%
           const totalArea = canvas.width * canvas.height;
           const maxEmptyArea = totalArea * 0.1;
           const minContentArea = totalArea - maxEmptyArea;
-          // Estimate item area needed (assume square images for simplicity)
-          const itemAreaPerImage = (canvas.width - 40) / 3 * (canvas.width - 40) / 3; // Approx per item
-          const totalItemArea = itemCount * itemAreaPerImage;
-          const billAreaEstimate = (canvas.width - 40) * (canvas.width - 40) * 0.6; // Approx bill area
-          const contentAreaEstimate = bill ? (billAreaEstimate + totalItemArea) : totalItemArea;
-          // Calculate required bill height to meet content area needs
+          const usableWidth = canvas.width - 40; // 20px padding each side
+          // Estimate item area needed (more accurate for bin-packing)
+          let totalItemArea = 0;
+          items.slice(0, itemCount).forEach(item => {
+            const img = new Image();
+            img.src = item.croppedUrl || item.url;
+            const aspect = img.width / img.height || 1;
+            const width = 150; // Base width for estimation
+            const height = width / aspect;
+            totalItemArea += width * height;
+          });
+          const billAreaEstimate = bill ? (usableWidth * (usableWidth * 0.6)) : 0; // Approx bill area
           if (bill) {
             billAreaHeight = Math.min(
               475, // Max bill height
               Math.max(
                 237.5, // Min bill height
-                (minContentArea - totalItemArea) / (canvas.width - 40) // Height to satisfy min content area
+                (minContentArea - totalItemArea) / usableWidth // Height to satisfy min content area
               )
             );
           } else {
@@ -433,7 +438,6 @@
 
           if (bill) {
             const billImageUrl = bill.croppedUrl || bill.url;
-            // Increase maxDimension and quality for clearer bill image
             resizeImage(billImageUrl, 3840, 0.95).then(resizedUrl => {
               const img = new Image();
               img.src = resizedUrl;
@@ -441,26 +445,27 @@
               img.onload = () => {
                 console.log('Resized bill image loaded');
                 const aspect = img.width / img.height;
-                const maxWidth = canvas.width - 40; // 20px padding each side
+                const maxWidth = usableWidth;
                 const maxHeight = billAreaHeight - 36 - 15; // Account for text and padding
                 let width = maxWidth;
                 let height = width / aspect;
-                // Maximize bill image size within bounds
+                // Maximize bill image size
                 if (height > maxHeight) {
                   height = maxHeight;
                   width = height * aspect;
+                } else {
+                  // Scale up to fill more space if possible
+                  const scaleFactor = Math.min(maxHeight / height, 1.2); // Limit upscale to 20%
+                  height *= scaleFactor;
+                  width = height * aspect;
+                  if (width > maxWidth) {
+                    width = maxWidth;
+                    height = width / aspect;
+                  }
                 }
                 const x = (canvas.width - width) / 2;
                 const y = 36;
-                if (bill.croppedUrl && bill.cropData) {
-                  // Use cropped image directly
-                  ctx.drawImage(img, 0, 0, img.width, img.height, x, y, width, height);
-                } else if (bill.cropData) {
-                  const { x: sx, y: sy, width: sWidth, height: sHeight } = bill.cropData;
-                  ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, width, height);
-                } else {
-                  ctx.drawImage(img, x, y, width, height);
-                }
+                ctx.drawImage(img, 0, 0, img.width, img.height, x, y, width, height);
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(x, y, width, height);
@@ -501,12 +506,9 @@
           }
           let loaded = 0;
           const maxItems = Math.min(itemCount, 12);
-          const itemAreaHeight = 950 - billAreaHeight - 4; // Reduced padding by 80% (20px to 4px)
+          const itemAreaHeight = 950 - billAreaHeight - 4; // 4px padding
           const usableWidth = canvas.width - 40; // 20px padding each side
           const usableHeight = itemAreaHeight;
-          const totalArea = canvas.width * canvas.height;
-          const maxEmptyArea = totalArea * 0.1;
-          const minContentArea = totalArea - maxEmptyArea;
 
           // Bin-packing algorithm (first-fit decreasing)
           const packItems = (items, maxWidth, maxHeight) => {
@@ -516,25 +518,25 @@
               .map((item, index) => {
                 const img = new Image();
                 img.src = item.croppedUrl || item.url;
-                return { item, index, width: img.width, height: img.height, aspect: img.width / img.height };
+                return { item, index, width: img.width, height: img.height, aspect: img.width / img.height || 1 };
               })
               .sort((a, b) => b.height - a.height);
 
             const bins = [{ x: 0, y: 0, width: maxWidth, height: maxHeight, items: [] }];
             const positions = [];
 
-            sortedItems.forEach(({ item, index, aspect }) => {
+            sortedItems.forEach(({ Dm({ item, index, aspect }) => {
               let bestBin = null;
               let bestFit = Infinity;
               let bestWidth, bestHeight, bestX, bestY;
 
               // Find best bin to place the item
               for (const bin of bins) {
-                let width = 150; // Base width for scaling
+                let width = maxWidth / 2; // Base width for scaling
                 let height = width / aspect;
                 if (height > bin.height || width > bin.width) {
                   // Try flipping orientation
-                  height = 150;
+                  height = maxHeight / 2;
                   width = height * aspect;
                   if (height > bin.height || width > bin.width) continue;
                 }
@@ -550,6 +552,10 @@
               }
 
               if (bestBin) {
+                // Maximize image size within bin
+                const scaleFactor = Math.min(bin.width / bestWidth, bin.height / bestHeight, 1.2); // Limit upscale
+                bestWidth *= scaleFactor;
+                bestHeight *= scaleFactor;
                 // Place item in the best bin
                 positions.push({ index, x: bestX, y: bestY, width: bestWidth, height: bestHeight });
                 bestBin.items.push({ index, width: bestWidth, height: bestHeight });
@@ -594,14 +600,7 @@
                 const pos = positions.find(p => p.index === index);
                 if (!pos) return; // Skip if no position found
                 const { x, y, width, height } = pos;
-                if (item.croppedUrl && item.cropData) {
-                  ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 4, width, height);
-                } else if (item.cropData) {
-                  const { x: sx, y: sy, width: sWidth, height: sHeight } = item.cropData;
-                  ctx.drawImage(img, sx, sy, sWidth, sHeight, x + 20, y + billAreaHeight + 4, width, height);
-                } else {
-                  ctx.drawImage(img, x + 20, y + billAreaHeight + 4, width, height);
-                }
+                ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 4, width, height);
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 4;
                 ctx.strokeRect(x + 20, y + billAreaHeight + 4, width, height);
@@ -632,7 +631,7 @@
                     }, 'image/jpeg', 0.95);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                    alert('Failed to generate collagen due to image access restrictions. Please use images from the same device.');
                   }
                 }
               };
