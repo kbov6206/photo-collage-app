@@ -65,10 +65,10 @@
             const cropData = cropper.getData();
             const croppedCanvas = cropper.getCroppedCanvas({
               imageSmoothingQuality: 'high',
-              maxWidth: 3840,
-              maxHeight: 3840,
+              maxWidth: 1920,
+              maxHeight: 1920,
             });
-            const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 1.0);
+            const croppedUrl = croppedCanvas.toDataURL('image/jpeg', 0.9);
             onSave({ cropData, croppedUrl });
           }
         };
@@ -177,39 +177,6 @@
               const ctx = canvas.getContext('2d');
               ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, width, height);
-
-              // Simplified sharpening filter
-              const imageData = ctx.getImageData(0, 0, width, height);
-              const data = imageData.data;
-              const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
-              const side = Math.round(Math.sqrt(kernel.length));
-              const halfSide = Math.floor(side / 2);
-              const tempData = data.slice();
-
-              for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                  const dstOff = (y * width + x) * 4;
-                  let r = 0, g = 0, b = 0;
-                  for (let cy = 0; cy < side; cy++) {
-                    for (let cx = 0; cx < side; cx++) {
-                      const scy = y + cy - halfSide;
-                      const scx = x + cx - halfSide;
-                      if (scy >= 0 && scy < height && scx >= 0 && scx < width) {
-                        const srcOff = (scy * width + scx) * 4;
-                        const wt = kernel[cy * side + cx];
-                        r += tempData[srcOff] * wt;
-                        g += tempData[srcOff + 1] * wt;
-                        b += tempData[srcOff + 2] * wt;
-                      }
-                    }
-                  }
-                  data[dstOff] = Math.min(255, Math.max(0, r));
-                  data[dstOff + 1] = Math.min(255, Math.max(0, g));
-                  data[dstOff + 2] = Math.min(255, Math.max(0, b));
-                }
-              }
-              ctx.putImageData(imageData, 0, 0);
-
               try {
                 const dataUrl = canvas.toDataURL('image/jpeg', quality);
                 resolve(dataUrl);
@@ -441,7 +408,7 @@
 
           if (bill) {
             const billImageUrl = bill.croppedUrl || bill.url;
-            resizeImage(billImageUrl, 3840, 1.0).then(resizedUrl => {
+            resizeImage(billImageUrl, 1920, 0.9).then(resizedUrl => {
               const img = new Image();
               img.src = resizedUrl;
               img.onload = () => {
@@ -493,7 +460,7 @@
           console.log('Drawing items:', items.length);
           if (items.length === 0) {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
               console.log('Setting collageUrl for empty items');
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
@@ -501,7 +468,7 @@
                   setCollageBlob(blob);
                   setRenderKey(prev => prev + 1);
                 }
-              }, 'image/jpeg', 1.0);
+              }, 'image/jpeg', 0.9);
             } catch (error) {
               console.error('Canvas tainted error:', error);
               alert('Failed to generate collage. Use images from the same device.');
@@ -522,64 +489,89 @@
                 img.src = item.croppedUrl || item.url;
                 return { item, index, width: img.width, height: img.height, aspect: img.width / img.height || 1 };
               })
-              .sort((a, b) => b.height - a.height);
+              .sort((a, b) => (b.width * b.height) - (a.width * a.height));
 
-            const bins = [{ x: 0, y: 0, width: maxWidth, height: maxHeight, items: [] }];
             const positions = [];
+            const root = { x: 0, y: 0, width: maxWidth, height: maxHeight };
+            const nodes = [root];
 
             sortedItems.forEach(({ item, index, aspect }) => {
-              let bestBin = null;
-              let bestFit = Infinity;
+              let bestNode = null;
               let bestWidth, bestHeight, bestX, bestY;
+              let minArea = Infinity;
 
-              for (const bin of bins) {
-                let width = maxWidth / 2;
+              nodes.forEach(node => {
+                let width = Math.min(maxWidth / 2, node.width);
                 let height = width / aspect;
-                if (height > bin.height || width > bin.width) {
-                  height = maxHeight / 2;
+                if (height > node.height) {
+                  height = Math.min(maxHeight / 2, node.height);
                   width = height * aspect;
-                  if (height > bin.height || width > bin.width) continue;
                 }
-                const fitScore = Math.abs(bin.width - width) + Math.abs(bin.height - height);
-                if (fitScore < bestFit) {
-                  bestFit = fitScore;
-                  bestBin = bin;
-                  bestWidth = width;
-                  bestHeight = height;
-                  bestX = bin.x;
-                  bestY = bin.y;
+                if (width <= node.width && height <= node.height) {
+                  const area = width * height;
+                  if (area < minArea) {
+                    minArea = area;
+                    bestNode = node;
+                    bestWidth = width;
+                    bestHeight = height;
+                    bestX = node.x;
+                    bestY = node.y;
+                  }
                 }
-              }
+              });
 
-              if (bestBin) {
-                const scaleFactor = Math.min(bestBin.width / bestWidth, bestBin.height / bestHeight, 1.2);
+              if (bestNode) {
+                const scaleFactor = Math.min(bestNode.width / bestWidth, bestNode.height / bestHeight, 1.2);
                 bestWidth *= scaleFactor;
                 bestHeight *= scaleFactor;
                 positions.push({ index, x: bestX, y: bestY, width: bestWidth, height: bestHeight });
-                bestBin.items.push({ index, width: bestWidth, height: bestHeight });
 
-                const newBins = [];
-                if (bestBin.width - bestWidth > 10) {
-                  newBins.push({
-                    x: bestBin.x + bestWidth + 10,
-                    y: bestBin.y,
-                    width: bestBin.width - bestWidth - 10,
-                    height: bestBin.height,
-                    items: [],
+                const nodeIndex = nodes.indexOf(bestNode);
+                nodes.splice(nodeIndex, 1);
+
+                if (bestNode.width - bestWidth > 10) {
+                  nodes.push({
+                    x: bestX + bestWidth + 10,
+                    y: bestY,
+                    width: bestNode.width - bestWidth - 10,
+                    height: bestHeight,
                   });
                 }
-                if (bestBin.height - bestHeight > 10) {
-                  newBins.push({
-                    x: bestBin.x,
-                    y: bestBin.y + bestHeight + 10,
-                    width: bestWidth,
-                    height: bestBin.height - bestHeight - 10,
-                    items: [],
+                if (bestNode.height - bestHeight > 10) {
+                  nodes.push({
+                    x: bestX,
+                    y: bestY + bestHeight + 10,
+                    width: bestNode.width,
+                    height: bestNode.height - bestHeight - 10,
                   });
                 }
-                bins.splice(bins.indexOf(bestBin), 1, ...newBins);
               }
             });
+
+            // Fallback grid for unplaced items
+            if (positions.length < sortedItems.length) {
+              console.log('Using fallback grid for unplaced items');
+              const unplaced = sortedItems.filter((_, idx) => !positions.find(p => p.index === idx));
+              const cols = Math.ceil(Math.sqrt(unplaced.length));
+              const cellWidth = (maxWidth - (cols - 1) * 10) / cols;
+              const cellHeight = (maxHeight - (Math.ceil(unplaced.length / cols) - 1) * 10) / Math.ceil(unplaced.length / cols);
+
+              unplaced.forEach(({ index }, idx) => {
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
+                const width = cellWidth;
+                const height = cellWidth / (sortedItems[index].aspect || 1);
+                const scaledHeight = Math.min(height, cellHeight);
+                const scaledWidth = scaledHeight * (sortedItems[index].aspect || 1);
+                positions.push({
+                  index,
+                  x: col * (cellWidth + 10),
+                  y: row * (cellHeight + 10),
+                  width: scaledWidth,
+                  height: scaledHeight,
+                });
+              });
+            }
 
             console.log('Packed positions:', positions);
             return positions;
@@ -628,7 +620,7 @@
 
           const finalizeCollage = () => {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
               console.log('Setting collageUrl with data length:', dataUrl.length);
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
@@ -637,7 +629,7 @@
                   setCollageBlob(blob);
                   setRenderKey(prev => prev + 1);
                 }
-              }, 'image/jpeg', 1.0);
+              }, 'image/jpeg', 0.9);
             } catch (error) {
               console.error('Canvas tainted error:', error);
               alert('Failed to generate collage. Use images from the same device.');
