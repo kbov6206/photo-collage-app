@@ -62,6 +62,47 @@
           setCollageBlob(null);
         };
 
+        // Resize image to max dimension with compression
+        const resizeImage = (src, maxDimension, quality) => {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.src = src;
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+              let width = img.width;
+              let height = img.height;
+              const aspect = width / height;
+              if (width > height) {
+                if (width > maxDimension) {
+                  width = maxDimension;
+                  height = width / aspect;
+                }
+              } else {
+                if (height > maxDimension) {
+                  height = maxDimension;
+                  width = height * aspect;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+              try {
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(dataUrl);
+              } catch (error) {
+                console.error('Resize image error:', error);
+                reject(error);
+              }
+            };
+            img.onerror = () => {
+              console.error('Failed to load image for resizing');
+              reject(new Error('Failed to load image for resizing'));
+            };
+          });
+        };
+
         // Initialize Google API Client and Authenticate
         useEffect(() => {
           const initGapi = () => {
@@ -228,34 +269,40 @@
           }
 
           if (bill) {
-            const img = new Image();
-            img.src = bill.url;
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-              console.log('Bill image loaded');
-              const aspect = img.width / img.height;
-              const maxWidth = 460; // 500 - 20px left - 20px right
-              const maxHeight = billAreaHeight - 36 - 15; // Area minus top padding and caption space
-              let width = maxWidth;
-              let height = width / aspect;
-              if (height > maxHeight) {
-                height = maxHeight;
-                width = height * aspect;
-              }
-              const x = (canvas.width - width) / 2; // Center horizontally
-              const y = 36; // Top padding
-              ctx.drawImage(img, x, y, width, height);
-              ctx.strokeStyle = '#000';
-              ctx.lineWidth = 4;
-              ctx.strokeRect(x, y, width, height);
-              ctx.fillText(billNumber, x, y - 15); // Caption at y=21
+            resizeImage(bill.url, 1280, 0.95).then(resizedUrl => {
+              const img = new Image();
+              img.src = resizedUrl;
+              img.crossOrigin = 'Anonymous';
+              img.onload = () => {
+                console.log('Resized bill image loaded');
+                const aspect = img.width / img.height;
+                const maxWidth = 460; // 500 - 20px left - 20px right
+                const maxHeight = billAreaHeight - 36 - 15; // Area minus top padding and caption space
+                let width = maxWidth;
+                let height = width / aspect;
+                if (height > maxHeight) {
+                  height = maxHeight;
+                  width = height * aspect;
+                }
+                const x = (canvas.width - width) / 2; // Center horizontally
+                const y = 36; // Top padding
+                ctx.drawImage(img, x, y, width, height);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(x, y, width, height);
+                ctx.fillText(billNumber, x, y - 15); // Caption at y=21
+                drawItems(canvas, ctx, billAreaHeight, itemCount);
+              };
+              img.onerror = () => {
+                console.error('Failed to load resized bill image');
+                alert('Failed to load bill image. Please try another image.');
+                drawItems(canvas, ctx, billAreaHeight, itemCount);
+              };
+            }).catch(error => {
+              console.error('Bill image resize error:', error);
+              alert('Failed to process bill image. Please try another image.');
               drawItems(canvas, ctx, billAreaHeight, itemCount);
-            };
-            img.onerror = () => {
-              console.error('Failed to load bill image');
-              alert('Failed to load bill image. Please try another image.');
-              drawItems(canvas, ctx, billAreaHeight, itemCount);
-            };
+            });
           } else {
             drawItems(canvas, ctx, billAreaHeight, itemCount);
           }
@@ -267,11 +314,11 @@
           console.log('Drawing items:', items.length);
           if (items.length === 0) {
             try {
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
                 if (blob) setCollageBlob(blob);
-              }, 'image/jpeg', 0.9);
+              }, 'image/jpeg', 0.75);
             } catch (error) {
               console.error('Canvas tainted error:', error);
               alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
@@ -335,11 +382,11 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 0.9);
+                    }, 'image/jpeg', 0.75);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
@@ -352,11 +399,11 @@
                 loaded++;
                 if (loaded === maxItems) {
                   try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
                     setCollageUrl(dataUrl);
                     canvas.toBlob(blob => {
                       if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 0.9);
+                    }, 'image/jpeg', 0.75);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
                     alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
