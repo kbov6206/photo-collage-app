@@ -134,7 +134,13 @@
         const [gapiReady, setGapiReady] = useState(false);
         const [isSavingAndSharing, setIsSavingAndSharing] = useState(false);
         const [cropModal, setCropModal] = useState(null);
+        const [renderKey, setRenderKey] = useState(0);
         const tokenClientRef = useRef(null);
+
+        // Log collageUrl changes
+        useEffect(() => {
+          console.log('collageUrl updated:', collageUrl ? 'Set' : 'Null');
+        }, [collageUrl]);
 
         // Clear all data
         const clearData = () => {
@@ -142,6 +148,7 @@
           setPhotos([]);
           setCollageUrl(null);
           setCollageBlob(null);
+          setRenderKey(prev => prev + 1);
         };
 
         // Resize and sharpen image
@@ -149,7 +156,6 @@
           return new Promise((resolve, reject) => {
             const img = new Image();
             img.src = src;
-            img.crossOrigin = 'anonymous';
             img.onload = () => {
               let width = img.width;
               let height = img.height;
@@ -172,10 +178,10 @@
               ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, width, height);
 
-              // Apply sharpening filter
+              // Simplified sharpening filter
               const imageData = ctx.getImageData(0, 0, width, height);
               const data = imageData.data;
-              const kernel = [-1, -1, -1, -1, 9, -1, -1, -1, -1];
+              const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
               const side = Math.round(Math.sqrt(kernel.length));
               const halfSide = Math.floor(side / 2);
               const tempData = data.slice();
@@ -231,7 +237,6 @@
                   const img = new Image();
                   img.src = reader.result;
                   img.onload = () => {
-                    // Check orientation for camera uploads
                     const isCamera = e.target.getAttribute('capture') === 'environment';
                     if (isCamera && img.width <= img.height) {
                       alert('Please take the bill photo in landscape orientation.');
@@ -489,9 +494,13 @@
           if (items.length === 0) {
             try {
               const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+              console.log('Setting collageUrl for empty items');
               setCollageUrl(dataUrl);
               canvas.toBlob(blob => {
-                if (blob) setCollageBlob(blob);
+                if (blob) {
+                  setCollageBlob(blob);
+                  setRenderKey(prev => prev + 1);
+                }
               }, 'image/jpeg', 1.0);
             } catch (error) {
               console.error('Canvas tainted error:', error);
@@ -550,21 +559,21 @@
                 bestBin.items.push({ index, width: bestWidth, height: bestHeight });
 
                 const newBins = [];
-                if (bestBin.width - bestWidth > 0) {
+                if (bestBin.width - bestWidth > 10) {
                   newBins.push({
-                    x: bestBin.x + bestWidth,
+                    x: bestBin.x + bestWidth + 10,
                     y: bestBin.y,
-                    width: bestBin.width - bestWidth,
+                    width: bestBin.width - bestWidth - 10,
                     height: bestBin.height,
                     items: [],
                   });
                 }
-                if (bestBin.height - bestHeight > 0) {
+                if (bestBin.height - bestHeight > 10) {
                   newBins.push({
                     x: bestBin.x,
-                    y: bestBin.y + bestHeight,
+                    y: bestBin.y + bestHeight + 10,
                     width: bestWidth,
-                    height: bestBin.height - bestHeight,
+                    height: bestBin.height - bestHeight - 10,
                     items: [],
                   });
                 }
@@ -572,6 +581,7 @@
               }
             });
 
+            console.log('Packed positions:', positions);
             return positions;
           };
 
@@ -581,28 +591,28 @@
             if (index < maxItems) {
               const img = new Image();
               img.src = item.croppedUrl || item.url;
-              img.crossOrigin = 'anonymous';
               img.onload = () => {
                 console.log('Item image loaded', index);
                 const pos = positions.find(p => p.index === index);
-                if (!pos) return;
+                if (!pos) {
+                  console.warn('No position for item', index);
+                  loaded++;
+                  if (loaded === maxItems) {
+                    finalizeCollage();
+                  }
+                  return;
+                }
                 const { x, y, width, height } = pos;
+                if (x < 0 || y < 0 || x + width > usableWidth || y + height > usableHeight) {
+                  console.warn('Invalid position for item', index, pos);
+                }
                 ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 8, width, height);
                 ctx.strokeStyle = 'black';
                 ctx.lineWidth = 8;
                 ctx.strokeRect(x + 20, y + billAreaHeight + 8, width, height);
                 loaded++;
                 if (loaded === maxItems) {
-                  try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
-                    setCollageUrl(dataUrl);
-                    canvas.toBlob(blob => {
-                      if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 1.0);
-                  } catch (error) {
-                    console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage. Use images from the same device.');
-                  }
+                  finalizeCollage();
                 }
               };
               img.onerror = () => {
@@ -610,20 +620,29 @@
                 alert('Failed to load item image ' + (index + 1) + '. Skipping.');
                 loaded++;
                 if (loaded === maxItems) {
-                  try {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
-                    setCollageUrl(dataUrl);
-                    canvas.toBlob(blob => {
-                      if (blob) setCollageBlob(blob);
-                    }, 'image/jpeg', 1.0);
-                  } catch (error) {
-                    console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage. Use images from the same device.');
-                  }
+                  finalizeCollage();
                 }
               };
             }
           });
+
+          const finalizeCollage = () => {
+            try {
+              const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+              console.log('Setting collageUrl with data length:', dataUrl.length);
+              setCollageUrl(dataUrl);
+              canvas.toBlob(blob => {
+                if (blob) {
+                  console.log('Collage blob created, size:', blob.size);
+                  setCollageBlob(blob);
+                  setRenderKey(prev => prev + 1);
+                }
+              }, 'image/jpeg', 1.0);
+            } catch (error) {
+              console.error('Canvas tainted error:', error);
+              alert('Failed to generate collage. Use images from the same device.');
+            }
+          };
         };
 
         // Upload to Google Drive
@@ -753,7 +772,7 @@
         };
 
         return (
-          <div className="p-4 max-w-4xl mx-auto">
+          <div className="p-4 max-w-4xl mx-auto" key={renderKey}>
             <h1 className="text-2xl font-bold mb-6">Photo Collage App</h1>
             <div className="mb-6">
               <label className="block mb-2 font-medium">Bill Number:</label>
