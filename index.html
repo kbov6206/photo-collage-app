@@ -54,6 +54,14 @@
         const [isSavingAndSharing, setIsSavingAndSharing] = useState(false);
         const tokenClientRef = useRef(null);
 
+        // Clear all data
+        const clearData = () => {
+          setBillNumber('');
+          setPhotos([]);
+          setCollageUrl(null);
+          setCollageBlob(null);
+        };
+
         // Initialize Google API Client and Authenticate
         useEffect(() => {
           const initGapi = () => {
@@ -272,35 +280,34 @@
           }
           let loaded = 0;
           const maxItems = Math.min(itemCount, 12); // Cap at 12 items
-          let itemAreaHeight, itemWidth, itemHeight, positions;
+          let itemAreaHeight = 950 - billAreaHeight - 20; // Remaining height minus bottom padding
+          let itemWidth, itemHeight, positions;
 
-          if (maxItems === 1) {
-            itemAreaHeight = 950 - billAreaHeight - 20; // 475px
-            itemWidth = 460; // Full width
-            itemHeight = itemAreaHeight;
-            positions = [[20, billAreaHeight]]; // Start at bill bottom
-          } else if (maxItems === 2) {
-            itemAreaHeight = 950 - billAreaHeight - 20; // 570px
-            itemWidth = 225; // (460 - 10px gap) / 2
-            itemHeight = itemAreaHeight;
-            positions = [[20, billAreaHeight], [255, billAreaHeight]]; // Side by side
-          } else if (maxItems === 3) {
-            itemAreaHeight = 950 - billAreaHeight - 20; // ~636px
-            itemWidth = 146.67; // (460 - 2*10px gaps) / 3
-            itemHeight = itemAreaHeight;
-            positions = [[20, billAreaHeight], [176.67, billAreaHeight], [333.34, billAreaHeight]]; // Side by side
-          } else {
-            itemAreaHeight = 712.5; // Fixed at 75% (950 - 237.5 - 20)
-            const rows = Math.ceil(maxItems / 3); // Rows needed
-            itemWidth = 146.67; // (460 - 2*10px gaps) / 3
-            itemHeight = (itemAreaHeight - (rows - 1) * 10) / rows; // Height per row
-            positions = [];
-            for (let row = 0; row < rows; row++) {
-              for (let col = 0; col < 3 && (row * 3 + col) < maxItems; col++) {
-                const x = 20 + col * (itemWidth + 10);
-                const y = billAreaHeight + row * (itemHeight + 10);
-                positions.push([x, y]);
-              }
+          // Define optimal layouts: [cols, rows]
+          const layouts = {
+            1: [1, 1], // 1x1
+            2: [2, 1], // 2x1
+            3: [3, 1], // 3x1
+            4: [2, 2], // 2x2
+            5: [3, 2], // 3x2
+            6: [3, 2], // 3x2
+            7: [3, 3], // 3x3
+            8: [3, 3], // 3x3
+            9: [3, 3], // 3x3
+            10: [3, 4], // 3x4
+            11: [3, 4], // 3x4
+            12: [3, 4], // 3x4
+          };
+
+          const [cols, rows] = layouts[maxItems];
+          itemWidth = (460 - (cols - 1) * 10) / cols; // Usable width minus gaps
+          itemHeight = (itemAreaHeight - (rows - 1) * 10) / rows; // Usable height minus gaps
+          positions = [];
+          for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols && (row * cols + col) < maxItems; col++) {
+              const x = 20 + col * (itemWidth + 10); // Left padding + column offset
+              const y = billAreaHeight + row * (itemHeight + 10); // Bill bottom + row offset
+              positions.push([x, y]);
             }
           }
 
@@ -546,12 +553,20 @@
                 </label>
               </div>
             </div>
-            <button
-              onClick={createCollage}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6"
-            >
-              Create Collage
-            </button>
+            <div className="flex space-x-4 mb-6">
+              <button
+                onClick={createCollage}
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              >
+                Create Collage
+              </button>
+              <button
+                onClick={clearData}
+                className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+              >
+                Clear Data
+              </button>
+            </div>
             {collageUrl && (
               <div className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">Collage Preview</h2>
