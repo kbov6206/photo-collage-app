@@ -205,6 +205,20 @@
           ctx.fillStyle = '#000';
 
           const bill = photos.find(p => p.category === 'Bill');
+          const items = photos.filter(p => p.category === 'Item');
+          const itemCount = Math.min(items.length, 4);
+
+          let billAreaHeight;
+          if (itemCount === 1) {
+            billAreaHeight = 475; // 50%
+          } else if (itemCount === 2) {
+            billAreaHeight = 380; // 40%
+          } else if (itemCount === 3) {
+            billAreaHeight = 314; // 33%
+          } else {
+            billAreaHeight = 237.5; // 25% for 4+
+          }
+
           if (bill) {
             const img = new Image();
             img.src = bill.url;
@@ -213,7 +227,7 @@
               console.log('Bill image loaded');
               const aspect = img.width / img.height;
               const maxWidth = 460; // 500 - 20px left - 20px right
-              const maxHeight = 345; // Maintain ~4:3 ratio
+              const maxHeight = billAreaHeight - 36 - 15; // Area minus top padding and caption space
               let width = maxWidth;
               let height = width / aspect;
               if (height > maxHeight) {
@@ -221,28 +235,28 @@
                 width = height * aspect;
               }
               const x = (canvas.width - width) / 2; // Center horizontally
-              const y = 36; // Increased top padding (30 * 1.2)
+              const y = 36; // Top padding
               ctx.drawImage(img, x, y, width, height);
               ctx.strokeStyle = '#000';
               ctx.lineWidth = 4;
               ctx.strokeRect(x, y, width, height);
               ctx.fillText(billNumber, x, y - 15); // Caption at y=21
-              drawItems(canvas, ctx);
+              drawItems(canvas, ctx, billAreaHeight);
             };
             img.onerror = () => {
               console.error('Failed to load bill image');
               alert('Failed to load bill image. Please try another image.');
-              drawItems(canvas, ctx);
+              drawItems(canvas, ctx, billAreaHeight);
             };
           } else {
-            drawItems(canvas, ctx);
+            drawItems(canvas, ctx, billAreaHeight);
           }
         };
 
         // Draw items
-        const drawItems = (canvas, ctx) => {
+        const drawItems = (canvas, ctx, billAreaHeight) => {
           const items = photos.filter(p => p.category === 'Item');
-          console.log('Drawing items:', items.length);
+          console.log('Items:', items.length);
           if (items.length === 0) {
             try {
               const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -252,35 +266,58 @@
               }, 'image/jpeg', 0.9);
             } catch (error) {
               console.error('Canvas tainted error:', error);
-              alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+              alert('Failed to generate collage due to image access restrictions.');
             }
             return;
           }
           let loaded = 0;
           const maxItems = Math.min(items.length, 4);
-          const itemHeight = (950 - 36 - 345 - 20 - (maxItems - 1) * 10) / maxItems; // Distribute remaining height
+          let itemAreaHeight, itemWidth, itemHeight, positions;
+
+          if (maxItems === 1) {
+            itemWidth = 460; // Full width
+            itemHeight = itemAreaHeight; // 475px
+            positions = [[20, billAreaHeight]]; // Start at bill bottom
+          } else if (maxItems === 2) {
+            itemWidth = 225; // (460 - 10px gap) / 2
+            itemHeight = 570; // 570px
+            positions = [[20, billAreaHeight], [255, billAreaHeight]]; // Side by side
+          } else if (maxItems === 3) {
+            itemWidth = 146.67; // (460 - 2*10px gaps) / 3
+            itemHeight = itemAreaHeight; // ~636px
+            positions = [[20, billAreaHeight], [176.67, billAreaHeight], [333.34, billAreaHeight]]; // Side by side
+          } else {
+            itemWidth = 225; // (460 - 10px gap) / 2
+            itemHeight = (itemAreaHeight - 10) / 2; // (400 - 10px gap) / 2 = 351.25px
+            positions = [
+              [20, billAreaHeight],
+              [255, billAreaHeight],
+              [20, billAreaHeight + 351.25 + 10],
+              [255, billAreaHeight + 351.25 + 10]
+            ]; // 2x2 grid
+          }
+
           items.forEach((item, index) => {
-            if (index < 4) {
+            if (index < maxItems) {
               const img = new Image();
               img.src = item.url;
               img.crossOrigin = 'Anonymous';
               img.onload = () => {
                 console.log('Item image loaded', index);
-                const maxWidth = 460; // 500 - 20px left - 20px right
-                const maxHeight = itemHeight; // Dynamic height per item
+                const [x, y] = positions[index];
                 const aspect = img.width / img.height;
-                let width = maxWidth;
+                let width = itemWidth;
                 let height = width / aspect;
-                if (height > maxHeight) {
-                  height = maxHeight;
+                if (height > itemHeight) {
+                  height = itemHeight;
                   width = height * aspect;
                 }
-                const x = (canvas.width - width) / 2; // Center horizontally
-                const y = 36 + 345 + 10 + index * (itemHeight + 10); // Stack vertically
-                ctx.drawImage(img, x, y, width, height);
+                const drawX = x + (itemWidth - width) / 2; // Center within item
+                const drawY = y + (itemHeight - height) / 2;
+                ctx.drawImage(img, drawX, drawY, width, height);
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 4;
-                ctx.strokeRect(x, y, width, height);
+                ctx.strokeRect(drawX, drawY, width, height);
                 loaded++;
                 if (loaded === maxItems) {
                   try {
@@ -291,7 +328,7 @@
                     }, 'image/jpeg', 0.9);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                    alert('Failed to generate collage due to image access restrictions.');
                   }
                 }
               };
@@ -308,7 +345,7 @@
                     }, 'image/jpeg', 0.9);
                   } catch (error) {
                     console.error('Canvas tainted error:', error);
-                    alert('Failed to generate collage due to image access restrictions. Please use images from the same device.');
+                    alert('Failed to generate collage due to image access restrictions.');
                   }
                 }
               };
@@ -322,7 +359,7 @@
             throw new Error('Please create a collage first.');
           }
           if (!billNumber.trim()) {
-            throw new Error('Please enter a Bill Number.');
+            throw new Error('Please enter a bill number.');
           }
           try {
             const accessToken = await getAccessToken();
@@ -332,7 +369,7 @@
               mimeType: 'image/jpeg',
               parents: [FOLDER_ID],
             };
-            const boundary = '-------314159265358979323846';
+            const boundary = '-------3141592653587';
             const delimiter = `\r\n--${boundary}\r\n`;
             const closeDelimiter = `\r\n--${boundary}--`;
             const multipartRequestBody =
@@ -373,13 +410,13 @@
             throw new Error('Please create a collage first.');
           }
           if (!billNumber.trim()) {
-            throw new Error('Please enter a Bill Number.');
+            throw new Error('Please enter a bill number.');
           }
           console.log('Preparing to share with Bill Number:', billNumber);
           return new Promise((resolve, reject) => {
             try {
               const file = new File([collageBlob], `${sanitizeFilename(billNumber)}.jpg`, { type: 'image/jpeg' });
-              console.log('File created for sharing, size:', file.size, 'type:', file.type);
+              console.log('File created for sharing:', file.type, 'size:', file.size);
               const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
               if (isMobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
                 console.log('Initiating navigator.share with share data:', { files: [file], text: billNumber, title: billNumber });
@@ -388,18 +425,18 @@
                   text: billNumber,
                   title: billNumber,
                 }).then(() => {
-                  console.log('Browser share successful');
+                  console.log('Sharing successful');
                   resolve(true);
-                }).catch(error => {
-                  console.error('Navigator share error:', error, 'Message:', error.message);
+                } catch (error => {
+                  console.error('Sharing error:', error.message);
                   if (error.name !== 'AbortError') {
-                    reject(new Error(`Failed to share: ${error.message || 'Unknown share error'}`));
+                    reject(new Error(`Failed to share: ${error.message || 'Unknown error'}`));
                   } else {
-                    resolve(false); // User canceled share
+                    resolve(false); // User canceled
                   }
                 });
               } else {
-                console.log('Browser sharing not supported or cannot share file, downloading');
+                console.log('Browser sharing not supported, downloading');
                 const link = document.createElement('a');
                 link.href = collageUrl;
                 link.download = `${sanitizeFilename(billNumber)}.jpg`;
@@ -408,12 +445,12 @@
               }
             } catch (error) {
               console.error('Share processing error:', error);
-              reject(new Error(`Share processing error: ${error.message || 'Unknown error'}`));
+              reject(new Error(`Share error: ${error.message || ''}`));
             }
           });
         };
 
-        // Save and Share (WhatsApp then Drive)
+        // Save and Share
         const saveAndShare = async () => {
           if (isSavingAndSharing) {
             alert('Please wait for the previous operation to complete.');
@@ -421,23 +458,21 @@
           }
           setIsSavingAndSharing(true);
           try {
-            // Step 1: Share to WhatsApp
             try {
               const shared = await shareToBrowser();
               if (!shared) {
-                console.log('WhatsApp sharing not supported or canceled');
+                console.log('Sharing not completed or not supported');
               }
             } catch (shareError) {
               console.error('Share error:', shareError);
-              alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Proceeding to upload to Drive.`);
+              alert(`Failed to share to WhatsApp: ${shareError.message || 'Unknown error'}. Continuing with upload.`);
             }
-            // Step 2: Upload to Google Drive in background
             try {
               const fileId = await uploadToDrive();
-              alert(`Uploaded to Google Drive! File ID: ${fileId}`);
+              alert(`Successfully uploaded to Google Drive! File ID: ${fileId}`);
             } catch (driveError) {
               console.error('Drive upload error:', driveError);
-              alert('Failed to upload to Google Drive: ' + (driveError.message || 'Unknown error') + '.');
+              alert(`Failed to upload to Drive: ${driveError.message || 'Unknown error'}.`);
             }
           } finally {
             setIsSavingAndSharing(false);
@@ -446,7 +481,7 @@
 
         return (
           <div className="p-4 max-w-4xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6">Photo Collage App</h1>
+            <h1 className="text-2xl font-bold mb-6">Photo Collage Application</h1>
             <div className="mb-6">
               <label className="block mb-2 font-medium">Bill Number:</label>
               <input
@@ -478,7 +513,7 @@
                   />
                 </label>
               </div>
-              <label className="block mb-2 font-medium">Item Photos (Multiple Allowed for Gallery):</label>
+              <label className="block mb-2 font-medium">Item Photos (multiple allowed for Gallery):</label>
               <div className="flex space-x-4 mb-4">
                 <label className="bg-green-500 text-white px-4 py-2 rounded cursor-pointer hover:bg-green-600">
                   Camera
