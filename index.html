@@ -494,13 +494,14 @@
 
           // Improved bin-packing algorithm
           const packItems = (items, maxWidth, maxHeight) => {
-            const sortedItems = items
+            let sortedItems = items
               .slice(0, maxItems)
               .map((item, index) => {
                 const img = new Image();
                 img.src = item.croppedUrl || item.url;
                 return { item, index, width: img.width, height: img.height, aspect: img.width / img.height || 1 };
               });
+            sortedItems.sort((a, b) => (b.width * b.height) - (a.width * a.height));
 
             const positions = [];
             const nodes = [{ x: 0, y: 0, width: maxWidth, height: maxHeight }];
@@ -564,18 +565,6 @@
                 }
               }
             });
-
-            if (positions.length === sortedItems.length) {
-              const totalArea = positions.reduce((sum, p) => sum + p.width * p.height, 0);
-              const targetArea = maxWidth * maxHeight * 0.9;
-              if (totalArea < targetArea) {
-                const scale = Math.sqrt(targetArea / totalArea);
-                positions.forEach(pos => {
-                  pos.width = Math.min(pos.width * scale, maxWidth - pos.x);
-                  pos.height = Math.min(pos.height * scale, maxHeight - pos.y);
-                });
-              }
-            }
 
             console.log('Packed positions:', positions);
             return positions;
@@ -884,13 +873,13 @@
                 <img src={collageUrl} alt="Collage" className="max-w-full h-auto mb-4" />
                 <div className="flex space-x-4">
                   <button
-                    onClick={() => saveAndShare()}
-                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                    disabled={isSavingAndSharing}
-                  >
-                    {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
-                  </button>
-                </div>
+                      onClick={() => saveAndShare()}
+                      className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                      disabled={isSavingAndSharing}
+                    >
+                      {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
+                    </button>
+                  </div>
               </div>
             )}
             {cropModal !== null && (
@@ -914,5 +903,4 @@
       console.error('Rendering error:', error);
     }
   </script>
-</body>
 </html>
