@@ -466,7 +466,50 @@
           }
         };
 
-        // Draw items with improved bin-packing
+        // Function to get justified positions
+        const getJustifiedPositions = (aspects, targetHeight, tolerance, spacing, effectiveWidth, showWidows, maxRows) => {
+          const positions = [];
+          let currentRow = [];
+          let y = 0;
+          let rowIndex = 0;
+          for (let i = 0; i < aspects.length; i++) {
+            currentRow.push(i);
+            let sumAspect = currentRow.map(j => aspects[j]).reduce((a, b) => a + b, 0);
+            let numGaps = currentRow.length - 1;
+            let rowWidth = effectiveWidth - numGaps * spacing;
+            let rowHeight = rowWidth / sumAspect;
+            let shouldFinalize = i === aspects.length - 1 || rowIndex >= maxRows - 1;
+            if (!shouldFinalize) {
+              let nextSum = sumAspect + aspects[i + 1];
+              let nextNumGaps = numGaps + 1;
+              let nextRowWidth = effectiveWidth - nextNumGaps * spacing;
+              let nextRowHeight = nextRowWidth / nextSum;
+              if (nextRowHeight < targetHeight * (1 - tolerance)) {
+                shouldFinalize = true;
+              }
+            }
+            if (shouldFinalize) {
+              sumAspect = currentRow.map(j => aspects[j]).reduce((a, b) => a + b, 0);
+              numGaps = currentRow.length - 1;
+              rowWidth = effectiveWidth - numGaps * spacing;
+              rowHeight = rowWidth / sumAspect;
+              let x = 0;
+              for (let j = 0; j < currentRow.length; j++) {
+                let index = currentRow[j];
+                let width = rowHeight * aspects[index];
+                positions[index] = { x, y, width, height: rowHeight };
+                x += width + spacing;
+              }
+              y += rowHeight + spacing;
+              currentRow = [];
+              rowIndex++;
+            }
+          }
+          const containerHeight = y - spacing;
+          return { positions, containerHeight };
+        };
+
+        // Draw items with justified layout
         const drawItems = (canvas, ctx, billAreaHeight, maxItems) => {
           const items = photos.filter(p => p.category === 'Item');
           console.log('Drawing items:', items.length);
@@ -491,127 +534,69 @@
           const itemAreaHeight = 1900 - billAreaHeight - 8;
           const usableWidth = canvas.width - 40;
           const usableHeight = itemAreaHeight;
-
-          // Improved bin-packing algorithm
-          const packItems = (items, maxWidth, maxHeight) => {
-            let sortedItems = items
-              .slice(0, maxItems)
-              .map((item, index) => {
-                const img = new Image();
-                img.src = item.croppedUrl || item.url;
-                return { item, index, width: img.width, height: img.height, aspect: img.width / img.height || 1 };
-              });
-            sortedItems.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-
-            const positions = [];
-            const nodes = [{ x: 0, y: 0, width: maxWidth, height: maxHeight }];
-            const itemCount = sortedItems.length;
-            const minSize = 100;
-            const baseWidth = Math.sqrt((maxWidth * maxHeight * 0.9) / itemCount) * 0.8;
-
-            sortedItems.forEach(({ item, index, aspect }, idx) => {
-              let bestNode = null;
-              let bestWidth, bestHeight, bestX, bestY;
-              let minScore = Infinity;
-
-              nodes.forEach(node => {
-                let width = Math.max(minSize, Math.min(baseWidth, node.width));
-                let height = width / aspect;
-                if (height > node.height) {
-                  height = Math.max(minSize, Math.min(node.height, baseWidth / aspect));
-                  width = height * aspect;
-                }
-                if (width <= node.width && height <= node.height) {
-                  const score = (node.width - width) + (node.height - height);
-                  if (score < minScore) {
-                    minScore = score;
-                    bestNode = node;
-                    bestWidth = width;
-                    bestHeight = height;
-                    bestX = node.x;
-                    bestY = node.y;
-                  }
-                }
-              });
-
-              if (bestNode) {
-                const scaleFactor = Math.min(
-                  bestNode.width / bestWidth,
-                  bestNode.height / bestHeight,
-                  1.2,
-                  (maxWidth * maxHeight * 0.9 / itemCount) / (bestWidth * bestHeight)
-                );
-                bestWidth *= scaleFactor;
-                bestHeight *= scaleFactor;
-                positions.push({ index, x: bestX, y: bestY, width: bestWidth, height: bestHeight });
-
-                const nodeIndex = nodes.indexOf(bestNode);
-                nodes.splice(nodeIndex, 1);
-                if (bestNode.width - bestWidth > minSize) {
-                  nodes.push({
-                    x: bestX + bestWidth + 10,
-                    y: bestY,
-                    width: bestNode.width - bestWidth - 10,
-                    height: bestHeight,
-                  });
-                }
-                if (bestNode.height - bestHeight > minSize) {
-                  nodes.push({
-                    x: bestX,
-                    y: bestY + bestHeight + 10,
-                    width: bestNode.width,
-                    height: bestNode.height - bestHeight - 10,
-                  });
-                }
+          const images = [];
+          items.slice(0, maxItems).forEach((item, index) => {
+            const img = new Image();
+            img.src = item.croppedUrl || item.url;
+            img.onload = () => {
+              images[index] = img;
+              loaded++;
+              if (loaded === maxItems) {
+                doLayoutAndDraw();
               }
-            });
-
-            console.log('Packed positions:', positions);
-            return positions;
-          };
-
-          const positions = packItems(items, usableWidth, usableHeight);
-
-          items.forEach((item, index) => {
-            if (index < maxItems) {
-              const img = new Image();
-              img.src = item.croppedUrl || item.url;
-              img.onload = () => {
-                console.log('Item image loaded', index);
-                const pos = positions.find(p => p.index === index);
-                if (!pos) {
-                  console.warn('No position for item', index);
-                  loaded++;
-                  if (loaded === maxItems) {
-                    finalizeCollage();
-                  }
-                  return;
-                }
-                const { x, y, width, height } = pos;
-                if (x < 0 || y < 0 || x + width > usableWidth || y + height > usableHeight) {
-                  console.warn('Invalid position for item', index, pos);
-                }
-                ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 8, width, height);
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 8;
-                ctx.strokeRect(x + 20, y + billAreaHeight + 8, width, height);
-                loaded++;
-                if (loaded === maxItems) {
-                  finalizeCollage();
-                }
-              };
-              img.onerror = () => {
-                console.error('Failed to load item image', index);
-                alert('Failed to load item image ' + (index + 1) + '. Skipping.');
-                loaded++;
-                if (loaded === maxItems) {
-                  finalizeCollage();
-                }
-              };
-            }
+            };
+            img.onerror = () => {
+              console.error('Failed to load item image', index);
+              alert('Failed to load item image ' + (index + 1) + '. Skipping.');
+              loaded++;
+              if (loaded === maxItems) {
+                doLayoutAndDraw();
+              }
+            };
           });
-
-          const finalizeCollage = () => {
+          const doLayoutAndDraw = () => {
+            const aspects = images.map(img => img.width / img.height);
+            const spacing = 10;
+            const containerPadding = 20;
+            const effectiveWidth = usableWidth;
+            const tolerance = 0.25;
+            const showWidows = true;
+            const maxRows = Infinity;
+            let low = 50;
+            let high = 2000;
+            let bestPositions = [];
+            let bestDiff = Infinity;
+            let bestContainerHeight = 0;
+            for (let iter = 0; iter < 25; iter++) {
+              const mid = (low + high) / 2;
+              const { positions, containerHeight } = getJustifiedPositions(aspects, mid, tolerance, spacing, effectiveWidth, showWidows, maxRows);
+              const diff = Math.abs(containerHeight - usableHeight);
+              if (diff < bestDiff) {
+                bestDiff = diff;
+                bestPositions = positions;
+                bestContainerHeight = containerHeight;
+              }
+              if (containerHeight < usableHeight) {
+                low = mid;
+              } else {
+                high = mid;
+              }
+            }
+            let scale = 1;
+            if (bestContainerHeight > usableHeight) {
+              scale = usableHeight / bestContainerHeight;
+            }
+            bestPositions.forEach((pos, index) => {
+              const img = images[index];
+              const x = pos.x * scale;
+              const y = pos.y * scale;
+              const width = pos.width * scale;
+              const height = pos.height * scale;
+              ctx.drawImage(img, 0, 0, img.width, img.height, x + 20, y + billAreaHeight + 8, width, height);
+              ctx.strokeStyle = 'black';
+              ctx.lineWidth = 8;
+              ctx.strokeRect(x + 20, y + billAreaHeight + 8, width, height);
+            });
             try {
               const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
               console.log('Setting collageUrl with data length:', dataUrl.length);
@@ -873,13 +858,13 @@
                 <img src={collageUrl} alt="Collage" className="max-w-full h-auto mb-4" />
                 <div className="flex space-x-4">
                   <button
-                      onClick={() => saveAndShare()}
-                      className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-                      disabled={isSavingAndSharing}
-                    >
-                      {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
-                    </button>
-                  </div>
+                    onClick={() => saveAndShare()}
+                    className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                    disabled={isSavingAndSharing}
+                  >
+                    {isSavingAndSharing ? 'Saving & Sharing...' : 'Save and Share'}
+                  </button>
+                </div>
               </div>
             )}
             {cropModal !== null && (
@@ -903,4 +888,5 @@
       console.error('Rendering error:', error);
     }
   </script>
+</body>
 </html>
