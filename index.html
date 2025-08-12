@@ -700,6 +700,7 @@
               type: 'user',
               role: 'owner',
               emailAddress: FOLDER_OWNER_EMAIL,
+              transferOwnership: true
             };
             const permissionResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
               method: 'POST',
