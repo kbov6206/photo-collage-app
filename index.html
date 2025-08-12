@@ -20,7 +20,6 @@
     try {
       const { useState, useEffect, useRef, Component } = React;
       const { createRoot } = ReactDOM;
-
       // Error Boundary Component
       class ErrorBoundary extends Component {
         state = { hasError: false, error: null };
@@ -39,12 +38,10 @@
           return this.props.children;
         }
       }
-
       // Crop Modal Component
       function CropModal({ image, onSave, onCancel }) {
         const cropperRef = useRef(null);
         const [zoom, setZoom] = useState(1);
-
         useEffect(() => {
           if (cropperRef.current) {
             const cropper = new Cropper(cropperRef.current, {
@@ -58,7 +55,6 @@
             return () => cropper.destroy();
           }
         }, []);
-
         const handleSave = () => {
           if (cropperRef.current) {
             const cropper = cropperRef.current.cropper;
@@ -72,7 +68,6 @@
             onSave({ cropData, croppedUrl });
           }
         };
-
         const handleZoom = (e) => {
           const newZoom = parseFloat(e.target.value);
           setZoom(newZoom);
@@ -80,13 +75,11 @@
             cropperRef.current.cropper.zoomTo(newZoom);
           }
         };
-
         const handleRotate = () => {
           if (cropperRef.current) {
             cropperRef.current.cropper.rotate(90);
           }
         };
-
         return (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-4 rounded-lg max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
@@ -130,14 +123,13 @@
           </div>
         );
       }
-
       // Google Drive API Configuration
       const CLIENT_ID = '684893590470-iq6ttkqrosa7buttlf7bnuvbcumfb1e2.apps.googleusercontent.com';
       const API_KEY = 'AIzaSyBDCNxfd_hjhAVk0lFcgaoTvZrHbQOAhAY';
       const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'];
-      const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+      const SCOPES = 'https://www.googleapis.com/auth/drive';
       const FOLDER_ID = '1fBeZUVeb3P0WVYE06YCfDyU9hy_vC0mf';
-
+      const FOLDER_OWNER_EMAIL = 'reachadeel@gmail.com'; // Replace with the actual folder owner's email
       function App() {
         const [photos, setPhotos] = useState([]);
         const [billNumber, setBillNumber] = useState('');
@@ -149,12 +141,10 @@
         const [cropModal, setCropModal] = useState(null);
         const [renderKey, setRenderKey] = useState(0);
         const tokenClientRef = useRef(null);
-
         // Log collageUrl changes
         useEffect(() => {
           console.log('collageUrl updated:', collageUrl ? 'Set' : 'Null');
         }, [collageUrl]);
-
         // Check Google login status
         const checkGoogleLogin = () => {
           if (!tokenClientRef.current) {
@@ -174,7 +164,6 @@
           setIsGoogleLoggedIn(false);
           return false;
         };
-
         // Handle Google login
         const handleGoogleLogin = () => {
           if (tokenClientRef.current) {
@@ -183,7 +172,6 @@
             setGapiReady(false); // Trigger reinitialization
           }
         };
-
         // Clear all data
         const clearData = () => {
           setBillNumber('');
@@ -193,7 +181,6 @@
           setIsGoogleLoggedIn(false); // Reset login state
           setRenderKey(prev => prev + 1);
         };
-
         // Resize image
         const resizeImage = (src, maxDimension, quality) => {
           return new Promise((resolve, reject) => {
@@ -235,7 +222,6 @@
             };
           });
         };
-
         // Handle photo upload
         const handlePhotoUpload = (e, category) => {
           if (!isGoogleLoggedIn) {
@@ -288,7 +274,6 @@
             }
           }
         };
-
         // Open crop modal
         const openCropModal = (index) => {
           if (!isGoogleLoggedIn) {
@@ -297,7 +282,6 @@
           }
           setCropModal(index);
         };
-
         // Save crop data
         const saveCrop = ({ cropData, croppedUrl }) => {
           setPhotos(prevPhotos => {
@@ -307,12 +291,10 @@
           });
           setCropModal(null);
         };
-
         // Cancel crop
         const cancelCrop = () => {
           setCropModal(null);
         };
-
         // Initialize Google API Client and Authenticate
         useEffect(() => {
           const initGapi = () => {
@@ -357,7 +339,6 @@
               });
             });
           };
-
           if (!gapiReady) {
             if (window.gapi && window.gapi.load) {
               initGapi();
@@ -371,7 +352,6 @@
               }
             }
           }
-
           return () => {
             const script = document.querySelector('script[src="https://apis.google.com/js/api.js"]');
             if (script) {
@@ -379,7 +359,6 @@
             }
           };
         }, [gapiReady]);
-
         // Get access token
         const getAccessToken = () => {
           return new Promise((resolve, reject) => {
@@ -418,12 +397,10 @@
             tokenClientRef.current.requestAccessToken();
           });
         };
-
         // Sanitize filename
         const sanitizeFilename = (name) => {
           return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100) || 'collage';
         };
-
         // Create collage
         const createCollage = () => {
           if (!isGoogleLoggedIn) {
@@ -448,11 +425,9 @@
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.font = 'bold 48px Arial';
           ctx.fillStyle = 'black';
-
           const bill = photos.find(p => p.category === 'Bill');
           const items = photos.filter(p => p.category === 'Item');
           const maxItems = Math.min(items.length, 12);
-
           let billAreaHeight;
           const totalArea = canvas.width * canvas.height;
           const maxEmptyArea = totalArea * 0.1;
@@ -479,7 +454,6 @@
           } else {
             billAreaHeight = 0;
           }
-
           if (bill) {
             const billImageUrl = bill.croppedUrl || bill.url;
             resizeImage(billImageUrl, 1920, 0.9).then(resizedUrl => {
@@ -528,7 +502,6 @@
             drawItems(canvas, ctx, billAreaHeight, maxItems);
           }
         };
-
         // Function to get justified positions
         const getJustifiedPositions = (aspects, targetHeight, tolerance, spacing, effectiveWidth, showWidows, maxRows) => {
           const positions = [];
@@ -571,7 +544,6 @@
           const containerHeight = y - spacing;
           return { positions, containerHeight };
         };
-
         // Draw items with justified layout
         const drawItems = (canvas, ctx, billAreaHeight, maxItems) => {
           const items = photos.filter(p => p.category === 'Item');
@@ -678,8 +650,7 @@
             }
           };
         };
-
-        // Upload to Google Drive
+        // Upload to Google Drive and transfer ownership
         const uploadToDrive = async () => {
           if (!gapiReady || !collageBlob) {
             throw new Error('Please create a collage first.');
@@ -709,7 +680,8 @@
               collageBlob,
               closeDelimiter
             ]);
-            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            // Upload the file
+            const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
               method: 'POST',
               headers: {
                 Authorization: `Bearer ${accessToken}`,
@@ -717,19 +689,38 @@
               },
               body: body,
             });
-            const result = await response.json();
-            console.log('Drive upload response:', result);
-            if (response.ok && result.id) {
-              return result.id;
-            } else {
-              throw new Error(`Upload failed: ${JSON.stringify(result)}`);
+            const uploadResult = await uploadResponse.json();
+            console.log('Drive upload response:', uploadResult);
+            if (!uploadResponse.ok || !uploadResult.id) {
+              throw new Error(`Upload failed: ${JSON.stringify(uploadResult)}`);
             }
+            // Transfer ownership
+            const fileId = uploadResult.id;
+            const permission = {
+              type: 'user',
+              role: 'owner',
+              emailAddress: FOLDER_OWNER_EMAIL,
+            };
+            const permissionResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(permission),
+            });
+            const permissionResult = await permissionResponse.json();
+            console.log('Permission update response:', permissionResult);
+            if (!permissionResponse.ok) {
+              console.error('Failed to transfer ownership:', permissionResult);
+              throw new Error(`Failed to transfer ownership: ${JSON.stringify(permissionResult)}`);
+            }
+            return fileId;
           } catch (error) {
-            console.error('Upload error:', error);
+            console.error('Upload or permission error:', error);
             throw error;
           }
         };
-
         // Share to browser (for WhatsApp)
         const shareToBrowser = () => {
           if (!collageBlob || !collageUrl) {
@@ -775,7 +766,6 @@
             }
           });
         };
-
         // Save and Share (WhatsApp then Drive)
         const saveAndShare = async () => {
           if (!isGoogleLoggedIn) {
@@ -799,16 +789,15 @@
             }
             try {
               const fileId = await uploadToDrive();
-              alert(`Uploaded to Google Drive! File ID: ${fileId}`);
+              alert(`Uploaded to Google Drive and ownership transferred! File ID: ${fileId}`);
             } catch (driveError) {
               console.error('Drive upload error:', driveError);
-              alert(`Failed to upload to Google Drive: ${driveError.message || 'Unknown error'}.`);
+              alert(`Failed to upload to Google Drive or transfer ownership: ${driveError.message || 'Unknown error'}.`);
             }
           } finally {
             setIsSavingAndSharing(false);
           }
         };
-
         return (
           <div className="p-4 max-w-4xl mx-auto" key={renderKey}>
             {!isGoogleLoggedIn && (
@@ -968,7 +957,6 @@
           </div>
         );
       }
-
       const root = createRoot(document.getElementById('root'));
       root.render(
         <ErrorBoundary>
